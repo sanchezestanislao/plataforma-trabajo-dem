@@ -257,7 +257,21 @@ igual([R.leerUbicacion('-32.8895, -68.8458'), R.leerUbicacion(' -32.8895   -68.8
   [{ lat: '-32.8895', lon: '-68.8458' }, { lat: '-32.8895', lon: '-68.8458' }, { lat: '-32.8895', lon: '-68.8458' }, { lat: '', lon: '' }], 'lee coordenadas escritas a mano, y acepta que falten');
 igual([R.leerUbicacion('https://www.google.com/maps/place/X/@-32.8911,-68.8869,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d-32.8908!4d-68.8872'), R.leerUbicacion('https://www.google.com/maps/@-32.8911,-68.8869,17z'), R.leerUbicacion('https://maps.google.com/?q=-32.8895,-68.8458'), R.leerUbicacion('https://www.google.com/maps/search/?api=1&query=-32.8895%2C-68.8458')],
   [{ lat: '-32.8908', lon: '-68.8872' }, { lat: '-32.8911', lon: '-68.8869' }, { lat: '-32.8895', lon: '-68.8458' }, { lat: '-32.8895', lon: '-68.8458' }], 'lee enlaces de Google Maps: prefiere el punto del lugar al centro del mapa');
-igual([R.leerUbicacion('frente a la plaza'), R.leerUbicacion('95, 10'), R.leerUbicacion('-32.8895')], [null, null, null], 'y rechaza lo que no es una ubicación');
+igual([R.leerUbicacion('frente a la plaza'), R.leerUbicacion('95, 10'), R.leerUbicacion('-32.8895'), R.leerUbicacion('Av. San Martín 1100, Mendoza')], [null, null, null, null], 'y rechaza lo que no es una ubicación');
+igual([R.leerUbicacion('https://share.google/sJIzX73O8LNmVxDjO'), R.leerUbicacion('https://maps.app.goo.gl/AbCdEf123456'), R.leerUbicacion('https://www.google.com/maps/place/Plaza+Independencia')], [null, null, null], 'los enlaces cortos de Compartir no traen la ubicación adentro: no hay nada que leer');
+igual([R.leerUbicacion('(-32.8895, -68.8458)'), R.leerUbicacion('-32,8895, -68,8458'), R.leerUbicacion('-32,8895 -68,8458'), R.leerUbicacion('-32,8895;-68,8458')],
+  [{ lat: '-32.8895', lon: '-68.8458' }, { lat: '-32.8895', lon: '-68.8458' }, { lat: '-32.8895', lon: '-68.8458' }, { lat: '-32.8895', lon: '-68.8458' }], 'acepta paréntesis y coma decimal');
+/* Casos públicos: la oficina de Google en Zúrich es 47°21'56.0"N 8°31'29.3"E y su código plus, 8FVC9G8F+6W; la fuente Merlion de
+   Singapur está en 1.286785, 103.854503 y es 6PH57VP3+PR6; la sede de Google es 849VCWC8+R9, o CWC8+R9 Mountain View. */
+const cerca = (u, lat, lon, tol) => !!u && Math.abs(Number(u.lat) - lat) <= tol && Math.abs(Number(u.lon) - lon) <= tol;
+igual([cerca(R.leerUbicacion('47°21\'56.0"N 8°31\'29.3"E'), 47.365556, 8.524806, 0.000002), R.leerUbicacion('32°53\'22.2"S 68°50\'44.9"W'), R.leerUbicacion('68°50\'44.9"O 32°53\'22.2"S')],
+  [true, { lat: '-32.8895', lon: '-68.845806' }, { lat: '-32.8895', lon: '-68.845806' }], 'lee grados, minutos y segundos, con sur y oeste en negativo y en cualquier orden');
+igual([cerca(R.leerUbicacion('8FVC9G8F+6W'), 47.365556, 8.524806, 0.00013), cerca(R.leerUbicacion('6PH57VP3+PR6'), 1.286785, 103.854503, 0.00003), cerca(R.leerUbicacion('849vcwc8+r9'), 37.4220, -122.0841, 0.0002)],
+  [true, true, true], 'lee el código plus completo de un lugar');
+igual([R.leerUbicacion('7VP3+PR6 Singapore', { lat: 1.35, lon: 103.82 }), R.leerUbicacion('CWC8+R9 Mountain View, California', { lat: 37.39, lon: -122.08 }), R.leerUbicacion('9G8F+6W Zurich', { lat: 47.41, lon: 8.47 })],
+  [R.leerUbicacion('6PH57VP3+PR6'), R.leerUbicacion('849VCWC8+R9'), R.leerUbicacion('8FVC9G8F+6W')], 'y el acortado, completándolo con un lugar cercano');
+const enMendoza = R.leerUbicacion('4563+XX Mendoza');
+igual([Math.abs(Number(enMendoza.lat) + 32.8895) < 0.5 && Math.abs(Number(enMendoza.lon) + 68.8458) < 0.5, R.leerUbicacion('8FVC9G8F+'), R.leerUbicacion('ABCD+12'), R.leerUbicacion('9G8+6W')], [true, null, null, null], 'sin otra referencia, un código acortado se busca cerca de Mendoza; uno mal escrito no se lee');
 igual([R.leerCodigoQR('https://app.ejemplo.com.ar/#q=12.123456'), R.leerCodigoQR('#q=3.a1b2c3d4e5f6a7b8c9'), R.leerCodigoQR('https://app.ejemplo.com.ar/#colaborador'), R.leerCodigoQR('https://otra.com/?q=hola')],
   [{ sede: '12', codigo: '123456' }, { sede: '3', codigo: 'a1b2c3d4e5f6a7b8c9' }, null, null], 'del QR de una sede saca la sede y el código');
 igual(R.leerCodigoQR(R.enlaceQR('7', '654321')), { sede: '7', codigo: '654321' }, 'y lee lo mismo que escribe la pantalla de la sede');

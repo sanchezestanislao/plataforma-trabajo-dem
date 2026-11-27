@@ -689,16 +689,61 @@ function adminPersonas() {
     '<section class="seccion"><h2>Personas</h2><p class="bajada">Cada persona ingresa con su DNI. Colaborador ficha y carga novedades; Supervisión además resuelve el día a día del equipo; Administración configura todo. Quien se va no se borra: se da de baja y su historia queda.</p>' +
     '<div class="panel"><div class="tabla-wrap"><table class="tabla-personas"><thead><tr><th>Persona</th><th>DNI</th><th>Rol</th><th>Acceso</th><th>Teléfono para fichar</th><th class="num">Acciones</th></tr></thead><tbody>' + filas + '</tbody></table></div>' + alta + '</div></section>';
 }
-/* Acepta "-32.8895, -68.8458" o un enlace de Google Maps. */
-function leerUbicacion(texto) {
+/* Códigos plus de Google Maps (Open Location Code): "47VH4563+XX" o, acortado, "4563+XX Mendoza". */
+const PLUS = '23456789CFGHJMPQRVWX';
+const MENDOZA = { lat: -32.8895, lon: -68.8458 };
+/* Centro de la celda de un código plus completo, escrito sin el signo +. */
+function decodificarPlus(c) {
+  let lat = -90, lon = -180, paso = 400;
+  for (let i = 0; i < Math.min(10, c.length); i += 2) { paso /= 20; lat += PLUS.indexOf(c[i]) * paso; lon += PLUS.indexOf(c[i + 1]) * paso; }
+  let alto = paso, ancho = paso;
+  for (let i = 10; i < c.length && i < 15; i++) { alto /= 5; ancho /= 4; const d = PLUS.indexOf(c[i]); lat += Math.floor(d / 4) * alto; lon += (d % 4) * ancho; }
+  return { lat: lat + alto / 2, lon: lon + ancho / 2 };
+}
+/* Al código acortado le falta el comienzo: se completa con el de un lugar cercano de referencia y se elige la celda más próxima. */
+function leerPlus(texto, ref) {
+  const m = /^([23456789CFGHJMPQRVWX]{2,8})\+([23456789CFGHJMPQRVWX]{2,5})(?:[\s,].*)?$/i.exec(texto);
+  if (!m || m[1].length % 2) return null;
+  const antes = m[1].toUpperCase(), despues = m[2].toUpperCase(), faltan = 8 - antes.length;
+  if (!faltan) return decodificarPlus(antes + despues);
+  const r = ref || MENDOZA, area = Math.pow(20, 2 - faltan / 2);
+  let a = r.lat + 90, o = r.lon + 180, paso = 400, comienzo = '';
+  for (let i = 0; i < faltan; i += 2) { paso /= 20; const da = Math.floor(a / paso), dn = Math.floor(o / paso); comienzo += PLUS[da] + PLUS[dn]; a -= da * paso; o -= dn * paso; }
+  const p = decodificarPlus(comienzo + antes + despues);
+  if (r.lat + area / 2 < p.lat && p.lat - area >= -90) p.lat -= area; else if (r.lat - area / 2 > p.lat && p.lat + area <= 90) p.lat += area;
+  if (r.lon + area / 2 < p.lon) p.lon -= area; else if (r.lon - area / 2 > p.lon) p.lon += area;
+  return p;
+}
+/* Grados, minutos y segundos, como los muestra Google Maps: 32°53'22.2"S 68°50'44.9"W. */
+function leerGrados(texto) {
+  const g = /(\d{1,3})\s*°\s*(\d{1,2})\s*['′’]\s*(\d{1,2}(?:[.,]\d+)?)\s*(?:"|″|”|'')\s*([NSEWO])/gi;
+  const a = g.exec(texto), b = g.exec(texto);
+  if (!a || !b) return null;
+  const valor = x => (Number(x[1]) + Number(x[2]) / 60 + Number(x[3].replace(',', '.')) / 3600) * (/[SWO]/i.test(x[4]) ? -1 : 1);
+  const ns = /[NS]/i.test(a[4]) ? a : /[NS]/i.test(b[4]) ? b : null, eo = ns === a ? b : a;
+  return ns && !/[NS]/i.test(eo[4]) ? { lat: valor(ns), lon: valor(eo) } : null;
+}
+/* Lee la ubicación de una sede. Acepta las dos coordenadas (con punto o con coma decimal, o en grados y minutos), el enlace
+   largo de Google Maps y el código plus. Devuelve null si no hay cómo leerla: es el caso de los enlaces cortos de Compartir,
+   que son un atajo y no traen la ubicación adentro. `ref` es un lugar cercano, para completar un código plus acortado. */
+function leerUbicacion(texto, ref) {
   const t = String(texto || '').trim();
   if (!t) return { lat: '', lon: '' };
+  const limpio = t.replace(/[()]/g, '').trim();
+  let p = null;
   const m = /!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/.exec(t) || /@(-?\d+\.\d+),(-?\d+\.\d+)/.exec(t) ||
-    /[?&](?:q|query|ll|destination)=(-?\d+(?:\.\d+)?)(?:,|%2C)\s*(-?\d+(?:\.\d+)?)/i.exec(t) || /^(-?\d{1,2}(?:\.\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)$/.exec(t);
-  if (!m) return null;
-  const lat = Number(m[1]), lon = Number(m[2]);
-  if (!(lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180)) return null;
-  return { lat: String(lat), lon: String(lon) };
+    /[?&](?:q|query|ll|destination|center)=(-?\d+(?:\.\d+)?)(?:,|%2C)\s*(-?\d+(?:\.\d+)?)/i.exec(t) || /^(-?\d{1,2}(?:\.\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:\.\d+)?)$/.exec(limpio);
+  const coma = m ? null : /^(-?\d{1,2}),(\d+)\s*[,;\s]\s*(-?\d{1,3}),(\d+)$/.exec(limpio);
+  if (m) p = { lat: Number(m[1]), lon: Number(m[2]) };
+  else if (coma) p = { lat: Number(coma[1] + '.' + coma[2]), lon: Number(coma[3] + '.' + coma[4]) };
+  else p = leerGrados(limpio) || leerPlus(limpio, ref);
+  if (!p || !(p.lat >= -90 && p.lat <= 90 && p.lon >= -180 && p.lon <= 180)) return null;
+  return { lat: String(Math.round(p.lat * 1e6) / 1e6), lon: String(Math.round(p.lon * 1e6) / 1e6) };
+}
+/* El centro de las sedes ya cargadas: lo más probable es que la próxima quede cerca. */
+function referenciaSedes() {
+  const con = S.sedes.filter(s => s.lat != null);
+  return con.length ? { lat: con.reduce((n, s) => n + s.lat, 0) / con.length, lon: con.reduce((n, s) => n + s.lon, 0) / con.length } : MENDOZA;
 }
 function verificacionOp(sel) { return Object.keys(VERIFICACION).map(k => '<option value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + VERIFICACION[k] + '</option>').join(''); }
 function camposSede(p, s) {
@@ -706,7 +751,7 @@ function camposSede(p, s) {
   const v = (k, def) => esc(d[p + k] != null ? d[p + k] : def);
   return '<label class="campo c-nombre" for="' + p + '-nombre">Nombre<input type="text" id="' + p + '-nombre" maxlength="60" data-draft="' + p + 'Nombre" value="' + v('Nombre', s ? s.nombre : '') + '"></label>' +
     '<label class="campo c-dir" for="' + p + '-dir">Dirección<input type="text" id="' + p + '-dir" maxlength="160" data-draft="' + p + 'Dir" value="' + v('Dir', s ? s.direccion : '') + '"></label>' +
-    '<label class="campo c-ubi" for="' + p + '-ubi">Ubicación<input type="text" id="' + p + '-ubi" data-draft="' + p + 'Ubi" placeholder="-32.8895, -68.8458 o un enlace de Google Maps" value="' + esc(ubi) + '"></label>' +
+    '<label class="campo c-ubi" for="' + p + '-ubi">Ubicación<input type="text" id="' + p + '-ubi" data-draft="' + p + 'Ubi" placeholder="-32.8895, -68.8458" value="' + esc(ubi) + '"></label>' +
     '<label class="campo c-radio" for="' + p + '-radio">Radio, en metros<input type="number" id="' + p + '-radio" min="30" max="2000" step="10" data-draft="' + p + 'Radio" value="' + v('Radio', s ? s.radio : 150) + '"></label>' +
     '<label class="campo c-ver" for="' + p + '-ver">Cómo se verifica el fichaje<select id="' + p + '-ver" data-draft="' + p + 'Ver">' + verificacionOp(d[p + 'Ver'] || (s ? s.verificacion : 'pantalla')) + '</select></label>';
 }
@@ -740,7 +785,7 @@ function adminSedes() {
       (s.lat == null ? '<p class="nota obs ancho-total">Sin ubicación cargada: los fichajes de esta sede no se comparan con ningún lugar.</p>' : '') +
       '<p class="error" role="alert">' + esc(S.ui.errores[p] || '') + '</p></form><div class="sede-extra">' + extra + '</div></li>';
   }).join('');
-  return '<section class="seccion"><h2>Sedes</h2><p class="bajada">Cada sede tiene su ubicación y su forma de verificar el fichaje. La ubicación se copia de Google Maps (clic derecho sobre el lugar) o se toma parado en la sede con el botón Usar mi ubicación actual. El radio es la distancia que se acepta alrededor de ese punto: adentro de los edificios el GPS suele errar varias decenas de metros.</p>' +
+  return '<section class="seccion"><h2>Sedes</h2><p class="bajada">Cada sede tiene su ubicación y su forma de verificar el fichaje. La ubicación se toma parado en la sede, con el botón Usar mi ubicación actual, o se copia de Google Maps: mantené apretado sobre el lugar (en la computadora, clic derecho) y copiá los dos números que aparecen. El enlace de Compartir no sirve: es un atajo y no trae la ubicación adentro. El radio es la distancia que se acepta alrededor de ese punto: adentro de los edificios el GPS suele errar varias decenas de metros.</p>' +
     (fichas ? '<ul class="panel sedes-lista">' + fichas + '</ul>' : '<p class="panel vacio">Todavía no hay sedes cargadas.</p>') + '</section>' +
     '<section class="seccion"><h2>Agregar una sede</h2><div class="panel"><form class="form-alta form-sede sin-borde" data-form="sede" data-id="" novalidate>' + camposSede('sn', null) +
     '<div class="botones ancho-total"><button class="btn primario" type="submit" id="btn-sede-alta">Agregar sede</button>' +
@@ -749,9 +794,13 @@ function adminSedes() {
 }
 function datosSede(p, id) {
   const val = k => { const el = document.getElementById(p + '-' + k); return el ? el.value : ''; };
-  const u = leerUbicacion(val('ubi'));
+  const u = leerUbicacion(val('ubi'), referenciaSedes());
   if (!val('nombre').trim()) return { error: 'Escribí el nombre de la sede.' };
-  if (!u) return { error: 'No pudimos leer la ubicación. Pegá las dos coordenadas, por ejemplo -32.8895, -68.8458, o el enlace de Google Maps.' };
+  if (!u) {
+    return { error: /^(https?:\/\/|www\.)|\b(goo\.gl|share\.google|g\.co|g\.page)\b/i.test(val('ubi').trim())
+      ? 'Ese enlace es un atajo y no trae la ubicación adentro. En Google Maps, mantené apretado sobre el lugar (en la computadora, clic derecho) y copiá los dos números que aparecen. O, parado en la sede, tocá Usar mi ubicación actual.'
+      : 'No pudimos leer la ubicación. Pegá las dos coordenadas, por ejemplo -32.8895, -68.8458, o el código plus del lugar, el que lleva un signo +.' };
+  }
   const actual = id ? S.sedes.find(s => s.id === id) : null;
   return { p: { id: id || null, nombre: val('nombre'), direccion: val('dir'), lat: u.lat, lon: u.lon, radio: val('radio'), verificacion: val('ver'), activa: actual ? actual.activa !== false : true } };
 }
@@ -1070,10 +1119,12 @@ function envioReal(f) {
   if (tipo === 'sede') {
     const id = f.dataset.id, p = id ? 'se' + id : 'sn', x = datosSede(p, id);
     if (x.error) { S.ui.errores[p] = x.error; render(); return true; }
+    const antes = id ? S.sedes.find(s => s.id === id) : null;
+    const movida = x.p.lat !== '' && (!antes || String(antes.lat) !== x.p.lat || String(antes.lon) !== x.p.lon);
     conServidor(async () => {
       const r = await llamar('admin_sede', { p: x.p });
       S.ui.errores[p] = r.ok ? '' : r.error;
-      if (r.ok) { limpiarBorradores(p); aviso(id ? 'Sede guardada.' : 'Sede agregada.'); }
+      if (r.ok) { limpiarBorradores(p); aviso((id ? 'Sede guardada.' : 'Sede agregada.') + (movida ? ' Revisá el punto con Ver en el mapa.' : '')); }
     });
     return true;
   }
