@@ -299,8 +299,62 @@ igual([dif.asigs.map(a => [/^[0-9]/.test(a.id) || a.id === 'a2' ? a.id : 'nueva'
 igual([dif.feriados.map(x => x.f + ' ' + x.tipo), dif.feriadosQuitar, dif.P.topeFijo, dif.avisos.length, /cambió el tope diario/.test(dif.avisos[0])],
   [['2026-12-08 no_laborable', '2026-12-24 no_laborable'], ['2026-12-25'], 6, 1, true], 'y feriados, reglas y el aviso nuevo para supervisión, sin repetir los que ya estaban');
 
-const cuenta = {};
-for (const j of S.jornadas) { const e = L.ev(S, j).estado; cuenta[e] = (cuenta[e] || 0) + 1; }
-console.log('Estados sembrados:', JSON.stringify(cuenta));
-console.log(ok + ' correctas, ' + mal + ' fallas');
-process.exit(mal ? 1 : 0);
+/* --- La función del servidor que convierte el enlace de Compartir de Google Maps en coordenadas --- */
+const pedidosAGoogle = [];
+let respuestas = {};
+const ctxF = vm.createContext({
+  console, URL, Request, Response, AbortController, setTimeout, clearTimeout,
+  Deno: { serve(f) { ctxF.atender = f; }, env: { get: k => (k === 'SUPABASE_URL' ? 'https://datos.ejemplo.com.ar' : undefined) } },
+  fetch: async (u, o) => {
+    /* El servicio de ingreso: reconoce una sola sesión. */
+    if (u === 'https://datos.ejemplo.com.ar/auth/v1/user') return new Response('{}', { status: o.headers.Authorization === 'Bearer sesion.de.prueba' && o.headers.apikey === 'sb_publishable_ejemplo' ? 200 : 401 });
+    pedidosAGoogle.push(u + ' ' + o.redirect);
+    const r = respuestas[u];
+    if (!r) throw new Error('sin red');
+    return new Response(r.cuerpo || null, { status: r.estado, headers: r.destino ? { location: r.destino } : {} });
+  }
+});
+vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'ubicacion', 'index.ts'), 'utf8'), ctxF);
+const pedirUbicacion = async (enlace, metodo, cabeceras) => {
+  const cab = cabeceras || { Authorization: 'Bearer sesion.de.prueba', apikey: 'sb_publishable_ejemplo' };
+  const r = await ctxF.atender(new Request('https://servidor.ejemplo/functions/v1/ubicacion', metodo === 'OPTIONS' ? { method: 'OPTIONS' } : { method: metodo || 'POST', headers: cab, body: metodo === 'GET' ? undefined : JSON.stringify({ enlace: enlace }) }));
+  return [r.status, metodo !== 'OPTIONS' && metodo !== 'GET' ? await r.json() : null, r.headers.get('access-control-allow-origin')];
+};
+/* Lo que contestó Google de verdad para un enlace compartido desde Google Maps: el punto del lugar va en !3d y !4d; lo que sigue a la arroba es el centro del mapa. */
+const DESTINO = 'https://www.google.com/maps/place/Cl%C3%ADnica+del+Pilar+Dalvian/@-32.874068,-68.8877066,17z/data=!4m6!3m5!1s0x967e091d0358d1cb:0xebb220873f616fc8!8m2!3d-32.8740725!4d-68.8851317!16s%2Fg%2F11nvmqxqvn?entry=tts&g_ep=EgoyMDI2MTEyMy4wIOC7DCoASAFQAw%3D%3D';
+(async () => {
+  respuestas = {
+    'https://maps.app.goo.gl/o9TK4y9btVsLxUmq8': { estado: 302, destino: DESTINO },
+    'https://maps.app.goo.gl/SoloMapa?g_st=ic': { estado: 302, destino: 'https://www.google.com/maps/@-32.8911,-68.8869,17z?entry=tts' },
+    'https://maps.app.goo.gl/Buscado': { estado: 301, destino: 'https://www.google.com/maps/search/-32.889500,+-68.845800?entry=tts' },
+    'https://maps.app.goo.gl/SinPunto': { estado: 302, destino: 'https://www.google.com/maps/place/Un+lugar/data=!4m2!3m1!1s0x0:0x1?entry=gps' },
+    'https://maps.app.goo.gl/Borrado': { estado: 404 },
+    'https://maps.app.goo.gl/Pagina': { estado: 200, cuerpo: '<html>!3d-1.5!4d-2.5</html>' },
+    'https://maps.app.goo.gl/AOtroSitio': { estado: 302, destino: 'https://otro-sitio.com.ar/maps/@-32.1,-68.1,17z' },
+    'https://goo.gl/maps/Viejo': { estado: 302, destino: 'https://maps.app.goo.gl/o9TK4y9btVsLxUmq8' }
+  };
+  igual(await pedirUbicacion('https://maps.app.goo.gl/o9TK4y9btVsLxUmq8'), [200, { ok: true, lat: -32.8740725, lon: -68.8851317, exacto: true }, '*'], 'del enlace de Compartir saca el punto del lugar, no el centro del mapa');
+  igual((await pedirUbicacion('maps.app.goo.gl/o9TK4y9btVsLxUmq8'))[1], { ok: true, lat: -32.8740725, lon: -68.8851317, exacto: true }, 'aunque llegue sin https adelante');
+  igual((await pedirUbicacion('https://goo.gl/maps/Viejo'))[1], { ok: true, lat: -32.8740725, lon: -68.8851317, exacto: true }, 'y también el formato viejo, que pasa por otro enlace corto');
+  igual([(await pedirUbicacion('https://maps.app.goo.gl/SoloMapa?g_st=ic'))[1], (await pedirUbicacion('https://maps.app.goo.gl/Buscado'))[1]],
+    [{ ok: true, lat: -32.8911, lon: -68.8869, exacto: false }, { ok: true, lat: -32.8895, lon: -68.8458, exacto: true }], 'si solo hay centro del mapa lo marca como no exacto; unas coordenadas buscadas sí lo son');
+  igual([(await pedirUbicacion('https://maps.app.goo.gl/SinPunto'))[1], (await pedirUbicacion('https://maps.app.goo.gl/Borrado'))[1], (await pedirUbicacion('https://maps.app.goo.gl/Pagina'))[1], (await pedirUbicacion('https://maps.app.goo.gl/NoContesta'))[1]],
+    [{ ok: false, motivo: 'sin_ubicacion' }, { ok: false, motivo: 'no_existe' }, { ok: false, motivo: 'sin_ubicacion' }, { ok: false, motivo: 'red' }], 'explica por qué no pudo: sin punto, enlace borrado, respuesta que no es un salto o sin red');
+  igual((await pedirUbicacion('https://maps.app.goo.gl/AOtroSitio'))[1], { ok: false, motivo: 'sin_ubicacion' }, 'no acepta coordenadas de un sitio que no es Google');
+  const antesDe = pedidosAGoogle.length;
+  igual([(await pedirUbicacion('https://www.google.com/maps/place/X/@-32.1,-68.1,17z'))[1], (await pedirUbicacion('https://share.google/sJIzX73O8LNmVxDjO'))[1], (await pedirUbicacion('https://servidor-interno.local/admin'))[1], (await pedirUbicacion('https://goo.gl/otra-cosa'))[1], (await pedirUbicacion(''))[1]],
+    [{ ok: false, motivo: 'enlace' }, { ok: false, motivo: 'enlace' }, { ok: false, motivo: 'enlace' }, { ok: false, motivo: 'enlace' }, { ok: false, motivo: 'enlace' }], 'solo atiende enlaces cortos de Google Maps');
+  igual(pedidosAGoogle.length, antesDe, 'y para los demás no sale a buscar nada');
+  igual(pedidosAGoogle.every(x => /^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps)\/\S+ manual$/.test(x)), true, 'nunca descarga una página de Google Maps ni sigue el salto por su cuenta');
+  igual([(await pedirUbicacion('', 'OPTIONS')).slice(0, 1).concat((await pedirUbicacion('', 'OPTIONS'))[2]), (await pedirUbicacion('', 'GET'))[0]], [[200, '*'], 405], 'contesta la consulta previa del navegador y rechaza lo que no es un pedido de la aplicación');
+  const sinSesion = pedidosAGoogle.length, mio = 'https://maps.app.goo.gl/o9TK4y9btVsLxUmq8';
+  igual([await pedirUbicacion(mio, 'POST', { apikey: 'sb_publishable_ejemplo' }), await pedirUbicacion(mio, 'POST', { Authorization: 'Bearer otra.sesion.vencida', apikey: 'sb_publishable_ejemplo' }), await pedirUbicacion(mio, 'POST', { Authorization: 'Bearer sb_publishable_ejemplo', apikey: 'sb_publishable_ejemplo' })],
+    [[401, { ok: false, motivo: 'sesion' }, '*'], [401, { ok: false, motivo: 'sesion' }, '*'], [401, { ok: false, motivo: 'sesion' }, '*']], 'sin una sesión abierta de verdad no atiende: ni con la llave pública sola, ni con una sesión vencida');
+  igual(pedidosAGoogle.length, sinSesion, 'y no sale a buscar nada');
+
+  const cuenta = {};
+  for (const j of S.jornadas) { const e = L.ev(S, j).estado; cuenta[e] = (cuenta[e] || 0) + 1; }
+  console.log('Estados sembrados:', JSON.stringify(cuenta));
+  console.log(ok + ' correctas, ' + mal + ' fallas');
+  process.exit(mal ? 1 : 0);
+})().catch(e => { console.error('ERROR', e); process.exit(1); });

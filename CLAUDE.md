@@ -36,6 +36,9 @@ Antes de subir un cambio tienen que pasar las cuatro pruebas de `pruebas/`.
 - `supabase/migraciones/`: la base. Todo vive en el esquema `dem`, que la API no expone. La aplicación solo llama a las
   funciones de `public`, y cada una revisa quién llama y con qué rol. Los errores que se le muestran a la persona salen
   con código `DEM01`; `DEM02` es sin sesión o de baja, `DEM03` falta cambiar la clave inicial y `DEM04` sin permiso.
+- `supabase/functions/ubicacion/`: función del servidor que convierte el enlace de Compartir de Google Maps
+  (maps.app.goo.gl) en coordenadas. Solo lee adónde redirige el enlace corto; no descarga páginas de Google. Se publica
+  con el conector de Supabase (`deploy_edge_function`), con `verify_jwt` activado, y además revisa la sesión por su cuenta.
 - `supabase/config.json`: dirección del proyecto y llave pública. Ahí nunca va una llave privada.
 - `pruebas/servidor-falso.js`: copia de trabajo de las funciones de la base, con los datos en memoria. Si cambia una
   función en `supabase/migraciones/`, se cambia también ahí.
@@ -67,6 +70,8 @@ Antes de subir un cambio tienen que pasar las cuatro pruebas de `pruebas/`.
 - Un turno sin entrada pasa a inasistencia cuando termina. Con entrada y sin salida, el sistema lo cierra solo seis
   horas después del fin del turno y la persona declara a qué hora terminó.
 - El valor de una asignación nueva no trae números de ejemplo: se propone el último cargado para esa modalidad.
+- La ubicación de una sede se carga pegando el enlace que da Google Maps al tocar Compartir. También se aceptan
+  coordenadas, el enlace largo, el código plus y «Usar mi ubicación actual».
 
 ## Convenciones
 

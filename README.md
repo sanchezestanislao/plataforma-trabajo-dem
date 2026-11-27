@@ -16,7 +16,7 @@ De las mismas fuentes salen dos versiones:
 | --- | --- |
 | `src/` | Las fuentes: plantilla, estilos, reglas (`logica.js`), pantallas (`vistas.js`), todo lo que habla con el servidor (`real.js`) y lo que hace instalable al sitio (`sitio.js`, `sw.js`, `manifest.webmanifest`, tipografía). |
 | `sitio/` | La versión real, lista para publicar. La genera `armar.py`: no se edita a mano. |
-| `supabase/` | La base de datos: `migraciones/` (tablas y funciones, en orden), `pruebas/` y `config.json` (dirección del proyecto y llave pública). |
+| `supabase/` | La base de datos: `migraciones/` (tablas y funciones, en orden), `pruebas/` y `config.json` (dirección del proyecto y llave pública). En `functions/ubicacion/`, la función que convierte el enlace de Compartir de Google Maps en coordenadas. |
 | `pruebas/` | Pruebas automáticas de las reglas, de la demo, de la versión real y de la instalación, y el servidor de pruebas. |
 
 ## Cómo se arma
@@ -69,8 +69,8 @@ no deja usar la cámara ni la ubicación, ni instalar la aplicación.
 
 1. Quien administra el sistema genera un **código de primera configuración**, que sirve una sola vez.
 2. Con ese código, el dueño abre el sitio y crea la cuenta de administración con su DNI y una clave.
-3. En Administración: carga las sedes con su ubicación, define la clave inicial, da de alta a las personas y carga
-   las asignaciones.
+3. En Administración: carga las sedes con su ubicación (se pega el enlace que da Google Maps al tocar Compartir),
+   define la clave inicial, da de alta a las personas y carga las asignaciones.
 4. En cada sede que use pantalla: Administración pide un código de vinculación, y en la tablet o computadora de la
    sede se abre el sitio terminado en `#pantalla` y se escribe ese código.
 

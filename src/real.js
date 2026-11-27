@@ -740,6 +740,23 @@ function leerUbicacion(texto, ref) {
   if (!p || !(p.lat >= -90 && p.lat <= 90 && p.lon >= -180 && p.lon <= 180)) return null;
   return { lat: String(Math.round(p.lat * 1e6) / 1e6), lon: String(Math.round(p.lon * 1e6) / 1e6) };
 }
+/* El enlace que da Google Maps al tocar Compartir. No trae la ubicación adentro: la busca el servidor. */
+function esEnlaceDeMaps(texto) { return /^(https?:\/\/)?(maps\.app\.goo\.gl\/|goo\.gl\/maps\/)\S+$/i.test(String(texto || '').trim()); }
+async function resolverEnlace(enlace) {
+  let r;
+  try {
+    let llave = await llaveVigente();
+    if (llave) r = await pedir('/functions/v1/ubicacion', { enlace: String(enlace).trim() }, llave);
+    if (llave && r.status === 401) { llave = await renovar(); if (llave) r = await pedir('/functions/v1/ubicacion', { enlace: String(enlace).trim() }, llave); }
+    if (!llave || r.status === 401) { alIngreso('Tu sesión se cerró. Ingresá de nuevo.'); return { error: '' }; }
+  } catch (e) { return { error: 'Sin conexión. Revisá tu señal y probá de nuevo.' }; }
+  const j = r.j || {};
+  const u = r.ok && j.ok ? leerUbicacion(j.lat + ', ' + j.lon) : null;
+  if (u) return { lat: u.lat, lon: u.lon, aproximada: j.exacto === false };
+  if (j.motivo === 'no_existe') return { error: 'Ese enlace ya no existe o quedó mal copiado. Compartí el lugar de nuevo desde Google Maps.' };
+  if (j.motivo === 'sin_ubicacion' || j.motivo === 'enlace') return { error: 'Ese enlace no trae la ubicación del lugar. Compartilo de nuevo desde Google Maps o pegá las dos coordenadas: mantené apretado sobre el lugar y copiá los dos números que aparecen.' };
+  return { error: 'No pudimos consultar ese enlace ahora. Probá de nuevo en un momento o pegá las dos coordenadas del lugar.' };
+}
 /* El centro de las sedes ya cargadas: lo más probable es que la próxima quede cerca. */
 function referenciaSedes() {
   const con = S.sedes.filter(s => s.lat != null);
@@ -751,7 +768,7 @@ function camposSede(p, s) {
   const v = (k, def) => esc(d[p + k] != null ? d[p + k] : def);
   return '<label class="campo c-nombre" for="' + p + '-nombre">Nombre<input type="text" id="' + p + '-nombre" maxlength="60" data-draft="' + p + 'Nombre" value="' + v('Nombre', s ? s.nombre : '') + '"></label>' +
     '<label class="campo c-dir" for="' + p + '-dir">Dirección<input type="text" id="' + p + '-dir" maxlength="160" data-draft="' + p + 'Dir" value="' + v('Dir', s ? s.direccion : '') + '"></label>' +
-    '<label class="campo c-ubi" for="' + p + '-ubi">Ubicación<input type="text" id="' + p + '-ubi" data-draft="' + p + 'Ubi" placeholder="-32.8895, -68.8458" value="' + esc(ubi) + '"></label>' +
+    '<label class="campo c-ubi" for="' + p + '-ubi">Ubicación<input type="text" id="' + p + '-ubi" data-draft="' + p + 'Ubi" placeholder="Enlace de Google Maps o coordenadas" value="' + esc(ubi) + '"></label>' +
     '<label class="campo c-radio" for="' + p + '-radio">Radio, en metros<input type="number" id="' + p + '-radio" min="30" max="2000" step="10" data-draft="' + p + 'Radio" value="' + v('Radio', s ? s.radio : 150) + '"></label>' +
     '<label class="campo c-ver" for="' + p + '-ver">Cómo se verifica el fichaje<select id="' + p + '-ver" data-draft="' + p + 'Ver">' + verificacionOp(d[p + 'Ver'] || (s ? s.verificacion : 'pantalla')) + '</select></label>';
 }
@@ -785,7 +802,7 @@ function adminSedes() {
       (s.lat == null ? '<p class="nota obs ancho-total">Sin ubicación cargada: los fichajes de esta sede no se comparan con ningún lugar.</p>' : '') +
       '<p class="error" role="alert">' + esc(S.ui.errores[p] || '') + '</p></form><div class="sede-extra">' + extra + '</div></li>';
   }).join('');
-  return '<section class="seccion"><h2>Sedes</h2><p class="bajada">Cada sede tiene su ubicación y su forma de verificar el fichaje. La ubicación se toma parado en la sede, con el botón Usar mi ubicación actual, o se copia de Google Maps: mantené apretado sobre el lugar (en la computadora, clic derecho) y copiá los dos números que aparecen. El enlace de Compartir no sirve: es un atajo y no trae la ubicación adentro. El radio es la distancia que se acepta alrededor de ese punto: adentro de los edificios el GPS suele errar varias decenas de metros.</p>' +
+  return '<section class="seccion"><h2>Sedes</h2><p class="bajada">Cada sede tiene su ubicación y su forma de verificar el fichaje. Para la ubicación, lo más simple es abrir el lugar en Google Maps, tocar Compartir y pegar acá ese enlace. También sirven las dos coordenadas, o tomarla parado en la sede con el botón Usar mi ubicación actual. El radio es la distancia que se acepta alrededor de ese punto: adentro de los edificios el GPS suele errar varias decenas de metros.</p>' +
     (fichas ? '<ul class="panel sedes-lista">' + fichas + '</ul>' : '<p class="panel vacio">Todavía no hay sedes cargadas.</p>') + '</section>' +
     '<section class="seccion"><h2>Agregar una sede</h2><div class="panel"><form class="form-alta form-sede sin-borde" data-form="sede" data-id="" novalidate>' + camposSede('sn', null) +
     '<div class="botones ancho-total"><button class="btn primario" type="submit" id="btn-sede-alta">Agregar sede</button>' +
@@ -794,15 +811,16 @@ function adminSedes() {
 }
 function datosSede(p, id) {
   const val = k => { const el = document.getElementById(p + '-' + k); return el ? el.value : ''; };
-  const u = leerUbicacion(val('ubi'), referenciaSedes());
+  const enlace = esEnlaceDeMaps(val('ubi')) ? val('ubi').trim() : '';
+  const u = enlace ? { lat: '', lon: '' } : leerUbicacion(val('ubi'), referenciaSedes());
   if (!val('nombre').trim()) return { error: 'Escribí el nombre de la sede.' };
   if (!u) {
-    return { error: /^(https?:\/\/|www\.)|\b(goo\.gl|share\.google|g\.co|g\.page)\b/i.test(val('ubi').trim())
-      ? 'Ese enlace es un atajo y no trae la ubicación adentro. En Google Maps, mantené apretado sobre el lugar (en la computadora, clic derecho) y copiá los dos números que aparecen. O, parado en la sede, tocá Usar mi ubicación actual.'
-      : 'No pudimos leer la ubicación. Pegá las dos coordenadas, por ejemplo -32.8895, -68.8458, o el código plus del lugar, el que lleva un signo +.' };
+    return { error: /^(https?:\/\/|www\.)|\b(share\.google|g\.co|g\.page)\b/i.test(val('ubi').trim())
+      ? 'Ese enlace no es el de Google Maps. Abrí el lugar en Google Maps, tocá Compartir y pegá ese enlace, que empieza con maps.app.goo.gl. También podés pegar las dos coordenadas.'
+      : 'No pudimos leer la ubicación. Pegá el enlace que da Google Maps al tocar Compartir, o las dos coordenadas, por ejemplo -32.8895, -68.8458.' };
   }
   const actual = id ? S.sedes.find(s => s.id === id) : null;
-  return { p: { id: id || null, nombre: val('nombre'), direccion: val('dir'), lat: u.lat, lon: u.lon, radio: val('radio'), verificacion: val('ver'), activa: actual ? actual.activa !== false : true } };
+  return { enlace: enlace, p: { id: id || null, nombre: val('nombre'), direccion: val('dir'), lat: u.lat, lon: u.lon, radio: val('radio'), verificacion: val('ver'), activa: actual ? actual.activa !== false : true } };
 }
 function limpiarBorradores(prefijo) { for (const k of Object.keys(S.ui.drafts)) if (k.indexOf(prefijo) === 0) delete S.ui.drafts[k]; }
 
@@ -1120,11 +1138,21 @@ function envioReal(f) {
     const id = f.dataset.id, p = id ? 'se' + id : 'sn', x = datosSede(p, id);
     if (x.error) { S.ui.errores[p] = x.error; render(); return true; }
     const antes = id ? S.sedes.find(s => s.id === id) : null;
-    const movida = x.p.lat !== '' && (!antes || String(antes.lat) !== x.p.lat || String(antes.lon) !== x.p.lon);
     conServidor(async () => {
+      let aproximada = false;
+      if (x.enlace) {
+        const u = await resolverEnlace(x.enlace);
+        if (!S) return;
+        if (u.error != null) { S.ui.errores[p] = u.error; return; }
+        x.p.lat = u.lat; x.p.lon = u.lon; aproximada = u.aproximada;
+      }
+      const movida = x.p.lat !== '' && (!antes || String(antes.lat) !== x.p.lat || String(antes.lon) !== x.p.lon);
       const r = await llamar('admin_sede', { p: x.p });
       S.ui.errores[p] = r.ok ? '' : r.error;
-      if (r.ok) { limpiarBorradores(p); aviso((id ? 'Sede guardada.' : 'Sede agregada.') + (movida ? ' Revisá el punto con Ver en el mapa.' : '')); }
+      if (r.ok) {
+        limpiarBorradores(p);
+        aviso((id ? 'Sede guardada.' : 'Sede agregada.') + (aproximada ? ' El enlace solo traía el centro del mapa: revisá el punto con Ver en el mapa.' : movida ? ' Revisá el punto con Ver en el mapa.' : ''));
+      }
     });
     return true;
   }

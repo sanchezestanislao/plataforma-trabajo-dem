@@ -30,7 +30,7 @@ function crear(opciones) {
   const o = opciones || {};
   const carpeta = o.carpeta || path.join(raiz, 'sitio');
   const M = {
-    desfase: 0, caido: false, pedidos: [],
+    desfase: 0, caido: false, pedidos: [], enlaces: {},
     config: { p: { gracia: 5, rojo: 15, margen: 15, topeFijo: 8, topeHora: 10, traslado: 30, recFeriado: 100, recNoLab: 0 }, ref: { hora: 0, fijo: 0 }, clave_inicial: null, instalacion_hash: null, instalacion_vence: 0, generado_hasta: null, asegurado: null },
     usuarios: [], llaves: {}, renovables: {},
     personas: [], sedes: [], pantallas: [], vinculos: [], asignaciones: [], franjas: [], licencias: [],
@@ -628,7 +628,7 @@ function crear(opciones) {
   }
   async function atender(req, res) {
     const u = new URL(req.url, 'http://localhost');
-    const esApi = u.pathname.indexOf('/auth/v1/') === 0 || u.pathname.indexOf('/rest/v1/') === 0;
+    const esApi = u.pathname.indexOf('/auth/v1/') === 0 || u.pathname.indexOf('/rest/v1/') === 0 || u.pathname.indexOf('/functions/v1/') === 0;
     if (esApi) {
       M.pedidos.push(req.method + ' ' + u.pathname + u.search);
       /* Para las pruebas: caido = true corta la conexión; un número responde con ese error del servidor. */
@@ -651,6 +651,14 @@ function crear(opciones) {
         return;
       }
       const s = sesionDe(req);
+      /* La función que convierte el enlace de Compartir de Google Maps en coordenadas (supabase/functions/ubicacion).
+         Acá no sale a internet: contesta con los enlaces de prueba cargados en M.enlaces. */
+      if (u.pathname === '/functions/v1/ubicacion') {
+        if (!s.uid) { json(res, 401, { code: 401, message: 'Invalid JWT' }); return; }
+        const clave = String(cuerpo.enlace || '').trim().replace(/^https?:\/\//i, '').split('?')[0];
+        json(res, 200, /^(maps\.app\.goo\.gl\/|goo\.gl\/maps\/)/i.test(clave) ? (M.enlaces[clave] || { ok: false, motivo: 'no_existe' }) : { ok: false, motivo: 'enlace' });
+        return;
+      }
       if (u.pathname === '/auth/v1/user' && req.method === 'PUT') {
         if (!s.uid) { json(res, 401, { code: 401, error_code: 'bad_jwt', msg: 'invalid JWT' }); return; }
         if (s.llave.sinSesion) { json(res, 403, { code: 403, error_code: 'session_not_found', msg: 'Session from session_id claim in JWT does not exist' }); return; }
