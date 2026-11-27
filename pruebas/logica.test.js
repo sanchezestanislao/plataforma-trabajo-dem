@@ -6,7 +6,7 @@ const vm = require('vm');
 
 const codigo = fs.readFileSync(path.join(__dirname, '..', 'src', 'logica.js'), 'utf8');
 const ctx = vm.createContext({ console });
-const nombres = ['evaluar', 'sembrar', 'tick', 'avanzarDia', 'cerrarJornada', 'marcarEntrada', 'resolver', 'deshacer', 'justificar', 'racha', 'resumenMes', 'resumenAsig', 'baseAsig', 'recargoFeriado', 'pendientes', 'pendienteDeclarar', 'declararOlvido', 'elegirColab', 'tramosHoy', 'tramosDelDia', 'tramoActual', 'ultimoCerrado', 'ev', 'relDe', 'ponerParam', 'agregarAsig', 'editarAsig', 'editarNombre', 'fichajeAsistido', 'agregarNovedad', 'alertas', 'coberturaDia', 'huecos', 'agregarLicencia', 'quitarLicencia', 'proximaLicencia', 'agregarFranja', 'editarFranja', 'quitarFranja', 'activos', 'feriadoEl', 'agregarFeriado', 'editarFeriado', 'quitarFeriado', 'impactoFeriado', 'minutosDelDia', 'topeDelDia', 'quitarAviso', 'hm', 'dur', 'aMin', 'aRel', 'finRel', 'lunesDe', 'diasCorridos', 'listaDias', 'esFecha', 'dIso'];
+const nombres = ['evaluar', 'sembrar', 'tick', 'avanzarDia', 'cerrarJornada', 'marcarEntrada', 'resolver', 'deshacer', 'justificar', 'racha', 'resumenMes', 'resumenAsig', 'baseAsig', 'recargoFeriado', 'pendientes', 'pendienteDeclarar', 'declararOlvido', 'elegirColab', 'tramosHoy', 'tramosDelDia', 'tramoActual', 'ultimoCerrado', 'ev', 'relDe', 'ponerParam', 'agregarAsig', 'editarAsig', 'editarNombre', 'fichajeAsistido', 'agregarNovedad', 'alertas', 'coberturaDia', 'huecos', 'agregarLicencia', 'quitarLicencia', 'proximaLicencia', 'agregarFranja', 'editarFranja', 'quitarFranja', 'activos', 'feriadoEl', 'agregarFeriado', 'editarFeriado', 'quitarFeriado', 'impactoFeriado', 'minutosDelDia', 'topeDelDia', 'quitarAviso', 'hm', 'dur', 'aMin', 'aRel', 'finRel', 'lunesDe', 'diasCorridos', 'listaDias', 'esFecha', 'dIso', 'esPropia', 'vivoHoy', 'colabSel', 'valorSugerido'];
 vm.runInContext(codigo + '\nthis.__api = { ' + nombres.join(', ') + ' };', ctx);
 const L = ctx.__api;
 
@@ -212,6 +212,78 @@ igual(L.ponerParam(ST, 'topeFijo', '5'), '', 'administración baja el tope de fi
 igual(ST.avisos[0].texto, 'Administración cambió el tope diario de las asignaciones fijas de 8 a 5 h. Con las asignaciones actuales quedan por encima: Marta Giménez, Ramón Ortiz, Néstor Vega y Hugo Luna.', 'el aviso nombra a quienes quedan por encima del tope nuevo');
 igual(L.alertas(ST).filter(x => x.tipo === 'tope').map(x => x.c), ['c1', 'c4', 'c6', 'c7'], 'cada alerta dice de quién es');
 igual([L.ponerParam(ST, 'topeFijo', '5'), ST.avisos.length], ['', 1], 'guardar el mismo tope no repite el aviso');
+
+/* --- Lo que la versión real le pide a las reglas --- */
+igual([['qr', 'codigo', 'impreso', 'ubicacion'].map(L.esPropia), ['supervisor', 'auto', 'declarada', null].map(L.esPropia)], [[true, true, true, true], [false, false, false, false]], 'marcas que hace la propia persona');
+const SR = L.sembrar();
+const jr = de(SR, 'a1', '2026-11-27');
+SR.ahora = 845;
+L.cerrarJornada(SR, jr.id, { conf: true }, 'codigo');
+const antesR = L.resumenMes(SR, 'c1', '2026-11').cerradasPorColab;
+jr.metodoOut = 'declarada';
+igual([jr.salida, antesR - L.resumenMes(SR, 'c1', '2026-11').cerradasPorColab], [845, 1], 'un cierre con el código de la sede cuenta como cerrado por la persona; uno avisado, no');
+const SV = L.sembrar();
+const tarde = { id: 'jx', a: 'a4', c: 'c4', f: '2026-11-26', sede: 'parque', ti: 840, tf: 1200, entrada: 838, salida: null, cerrada: false, justif: null };
+igual([L.vivoHoy(SV, tarde), L.vivoHoy(SV, Object.assign({}, tarde, { cerrada: true, salida: 1205 })), L.vivoHoy(SV, Object.assign({}, tarde, { cerrada: true, salida: 1450 })), L.vivoHoy(SV, Object.assign({}, tarde, { f: '2026-11-25' }))],
+  [true, false, true, false], 'un turno de ayer sigue vivo si quedó abierto o cerró pasada la medianoche, aunque no sea nocturno');
+const SY = L.sembrar();
+SY.real = true; SY.yo = { id: 'c3' }; SY.ui.colab = 'c1';
+igual([L.colabSel(SY).id, SY.ui.colab], ['c3', 'c1'], 'en la versión real el teléfono es de quien ingresó');
+SY.yo = { id: 'c99' };
+igual(L.colabSel(SY), null, 'y quien no tiene asignaciones activas no tiene pantalla de fichaje');
+for (const a of SY.asigs) if (a.c === 'c3') a.activa = false;
+SY.yo = { id: 'c3' };
+igual(L.colabSel(SY), null, 'tampoco quien las tiene todas inactivas');
+const SG = L.sembrar();
+igual([L.valorSugerido(SG, 'hora'), L.valorSugerido(SG, 'fijo')], [6500, 950000], 'con valores de referencia, se proponen esos');
+SG.ref = { hora: 0, fijo: 0 };
+SG.asigs.find(a => a.id === 'a9').valor = 7200;
+igual([L.valorSugerido(SG, 'hora'), L.valorSugerido(SG, 'hora', 'a9'), L.valorSugerido(SG, 'otra')], [7200, 6500, 0], 'sin referencia, se propone el valor de la última asignación de esa modalidad');
+igual([L.editarAsig(SG, 'a1', 'modalidad', 'hora'), SG.asigs.find(a => a.id === 'a1').valor], ['', 7200], 'al pasar una asignación a por hora toma ese valor en lugar de dejar el monto mensual');
+SG.asigs = SG.asigs.filter(a => a.modalidad !== 'fijo' || a.id === 'a4');
+igual([L.editarAsig(SG, 'a2', 'modalidad', 'fijo'), SG.asigs.find(a => a.id === 'a2').valor], ['', 950000], 'y a fijo, el de otra asignación fija');
+SG.asigs = SG.asigs.filter(a => a.modalidad !== 'fijo');
+igual([L.editarAsig(SG, 'a3', 'modalidad', 'fijo'), SG.asigs.find(a => a.id === 'a3').valor], ['', 6500], 'si no hay de dónde tomarlo, conserva el valor y queda para corregir');
+
+/* --- Piezas de la versión real que no necesitan navegador (src/real.js) --- */
+const real = donde => {
+  const c = vm.createContext({ console, CONFIG: { url: 'https://datos.ejemplo.com.ar', clave: 'sb_publishable_ejemplo', qr: 'qr.js' }, location: Object.assign({ origin: 'https://app.ejemplo.com.ar', pathname: '/', hash: '', search: '' }, donde) });
+  vm.runInContext(codigo + '\n' + fs.readFileSync(path.join(__dirname, '..', 'src', 'real.js'), 'utf8') + '\nthis.__real = { API, leerUbicacion, leerCodigoQR, cambiosAdmin, distanciaTexto, evidenciaTexto, respaldoCorto, enlaceQR, clonar };', c);
+  return c.__real;
+};
+const R = real({ hostname: 'app.ejemplo.com.ar' });
+igual([R.API.url, real({ hostname: 'localhost', origin: 'http://localhost:8765' }).API.url], ['https://datos.ejemplo.com.ar', 'http://localhost:8765'], 'publicada, la aplicación habla con su servidor de datos; en la computadora de desarrollo, con el servidor de pruebas');
+igual([R.leerUbicacion('-32.8895, -68.8458'), R.leerUbicacion(' -32.8895   -68.8458 '), R.leerUbicacion('-32.8895;-68.8458'), R.leerUbicacion('')],
+  [{ lat: '-32.8895', lon: '-68.8458' }, { lat: '-32.8895', lon: '-68.8458' }, { lat: '-32.8895', lon: '-68.8458' }, { lat: '', lon: '' }], 'lee coordenadas escritas a mano, y acepta que falten');
+igual([R.leerUbicacion('https://www.google.com/maps/place/X/@-32.8911,-68.8869,17z/data=!3m1!4b1!4m6!3m5!1s0x0:0x0!8m2!3d-32.8908!4d-68.8872'), R.leerUbicacion('https://www.google.com/maps/@-32.8911,-68.8869,17z'), R.leerUbicacion('https://maps.google.com/?q=-32.8895,-68.8458'), R.leerUbicacion('https://www.google.com/maps/search/?api=1&query=-32.8895%2C-68.8458')],
+  [{ lat: '-32.8908', lon: '-68.8872' }, { lat: '-32.8911', lon: '-68.8869' }, { lat: '-32.8895', lon: '-68.8458' }, { lat: '-32.8895', lon: '-68.8458' }], 'lee enlaces de Google Maps: prefiere el punto del lugar al centro del mapa');
+igual([R.leerUbicacion('frente a la plaza'), R.leerUbicacion('95, 10'), R.leerUbicacion('-32.8895')], [null, null, null], 'y rechaza lo que no es una ubicación');
+igual([R.leerCodigoQR('https://app.ejemplo.com.ar/#q=12.123456'), R.leerCodigoQR('#q=3.a1b2c3d4e5f6a7b8c9'), R.leerCodigoQR('https://app.ejemplo.com.ar/#colaborador'), R.leerCodigoQR('https://otra.com/?q=hola')],
+  [{ sede: '12', codigo: '123456' }, { sede: '3', codigo: 'a1b2c3d4e5f6a7b8c9' }, null, null], 'del QR de una sede saca la sede y el código');
+igual(R.leerCodigoQR(R.enlaceQR('7', '654321')), { sede: '7', codigo: '654321' }, 'y lee lo mismo que escribe la pantalla de la sede');
+igual([R.distanciaTexto(42.4), R.distanciaTexto(999), R.distanciaTexto(1000), R.distanciaTexto(6699)], ['42 m', '999 m', '1 km', '6,7 km'], 'distancias en metros o en kilómetros');
+igual([R.evidenciaTexto({ g: 'ok', d: 12, t: 'registrado' }), R.evidenciaTexto({ g: 'lejos', d: 6699, t: 'otro' }), R.evidenciaTexto({ g: 'sin_dato', t: 'compartido' }), R.evidenciaTexto(null), R.respaldoCorto({ g: 'sin_dato' }), R.respaldoCorto({ g: 'ok' })],
+  [', ubicación a 12 m de la sede', ', ubicación a 6,7 km de la sede, fuera del radio, otro teléfono', ', sin ubicación, teléfono de otra persona', '', ', sin ubicación', ''], 'respaldo de una marca, en palabras');
+const A0 = L.sembrar();
+A0.avisos = [{ id: '9', f: A0.hoy, m: 600, texto: 'viejo' }];
+igual(R.cambiosAdmin(A0, R.clonar(A0)), {}, 'sin cambios, no hay nada que mandar al servidor');
+const B0 = R.clonar(A0);
+L.editarAsig(B0, 'a2', 'tf', '14:00');
+igual(L.agregarAsig(B0, { colab: 'c8', sede: 'norte', dias: [6], ti: '15:00', tf: '18:00', modalidad: 'hora', valor: '7000' }), '', 'una asignación nueva sobre la copia');
+L.editarFranja(B0, 'f3', 'dot', '3');
+L.quitarFranja(B0, 'f5');
+L.agregarFranja(B0, { sede: 'norte', dias: [6], ti: '08:00', tf: '12:00', dot: '1' });
+L.agregarLicencia(B0, { colab: 'c2', tipo: 'franco', desde: '2026-12-10', hasta: '2026-12-10' });
+L.quitarLicencia(B0, 'l3');
+L.agregarFeriado(B0, { f: '2026-12-24', nombre: 'Asueto', tipo: 'no_laborable' });
+L.editarFeriado(B0, '2026-12-08', 'no_laborable');
+L.quitarFeriado(B0, '2026-12-25');
+L.ponerParam(B0, 'topeFijo', '6');
+const dif = R.cambiosAdmin(A0, B0);
+igual([dif.asigs.map(a => [/^[0-9]/.test(a.id) || a.id === 'a2' ? a.id : 'nueva', a.c, a.tf]), dif.franjas.map(x => [x.id === 'f3' ? 'f3' : 'nueva', x.dot]), dif.franjasQuitar, dif.licencias.map(l => [l.c, l.tipo]), dif.licenciasQuitar],
+  [[['a2', 'c2', 840], ['nueva', 'c8', 1080]], [['f3', 3], ['nueva', 1]], ['f5'], [['c2', 'franco']], ['l3']], 'a administración le manda solo lo que cambió: asignaciones, franjas y ausencias');
+igual([dif.feriados.map(x => x.f + ' ' + x.tipo), dif.feriadosQuitar, dif.P.topeFijo, dif.avisos.length, /cambió el tope diario/.test(dif.avisos[0])],
+  [['2026-12-08 no_laborable', '2026-12-24 no_laborable'], ['2026-12-25'], 6, 1, true], 'y feriados, reglas y el aviso nuevo para supervisión, sin repetir los que ya estaban');
 
 const cuenta = {};
 for (const j of S.jornadas) { const e = L.ev(S, j).estado; cuenta[e] = (cuenta[e] || 0) + 1; }

@@ -78,6 +78,8 @@ function dur(m) {
   return r + ' min';
 }
 function cap(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
+/* Marcas que hace la propia persona: QR de la pantalla, código escrito, QR impreso o solo ubicación. */
+function esPropia(m) { return m === 'qr' || m === 'codigo' || m === 'impreso' || m === 'ubicacion'; }
 function enLista(l) { return l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1]; }
 function fechaObj(iso) { const p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2])); }
 function isoDe(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
@@ -211,6 +213,10 @@ function ev(S, j) { return evaluar(j, S.P, relDe(S, j)); }
 function porInicio(a, b) { return a.f < b.f ? -1 : a.f > b.f ? 1 : a.ti - b.ti; }
 function activos(S) { return S.colabs.filter(c => S.asigs.some(a => a.c === c.id && a.activa)); }
 function colabSel(S) {
+  if (S.real) {
+    const yo = S.yo ? colab(S, S.yo.id) : null;
+    return yo && S.asigs.some(a => a.c === yo.id && a.activa) ? yo : null;
+  }
   const act = activos(S);
   let c = act.find(x => x.id === S.ui.colab) || null;
   if (!c) {
@@ -219,10 +225,11 @@ function colabSel(S) {
   }
   return c;
 }
-/* Un tramo cuenta para hoy si empieza hoy, o si es un turno nocturno de ayer que sigue abierto o cerró pasada la medianoche. */
+/* Un tramo cuenta para hoy si empieza hoy, o si es de ayer y sigue abierto o cerró pasada la medianoche:
+   el turno nocturno, y también el de la tarde que se alarga más allá de las 24. */
 function vivoHoy(S, j) {
   if (j.f === S.hoy) return true;
-  if (j.tf <= 1440 || j.f !== sumarDias(S.hoy, -1)) return false;
+  if (j.f !== sumarDias(S.hoy, -1)) return false;
   return !j.cerrada || (j.salida != null && j.salida > 1440);
 }
 function tramosHoy(S, cId) { return S.jornadas.filter(j => j.c === cId && vivoHoy(S, j)).sort(porInicio); }
@@ -334,7 +341,7 @@ function resumen(S, filtro, mes) {
     }
     if (e.pendiente && j.salida == null) o.sinSalida++;
     if (e.inasistencia) o.inasistencias++;
-    if (j.entrada != null) { o.conEntrada++; if (j.metodoOut === 'qr') o.cerradasPorColab++; }
+    if (j.entrada != null) { o.conEntrada++; if (esPropia(j.metodoOut)) o.cerradasPorColab++; }
   }
   return o;
 }
@@ -608,6 +615,13 @@ function editarNombre(S, cId, valor) {
   c.nombre = n.nombre.slice(0, 30); c.apellido = n.apellido.slice(0, 40);
   return '';
 }
+/* Valor que se propone para una modalidad: el de referencia o, si no hay, el de la última asignación cargada con esa modalidad. */
+function valorSugerido(S, modalidad, salvoId) {
+  if (S.ref && S.ref[modalidad] > 0) return S.ref[modalidad];
+  let v = 0;
+  for (const a of S.asigs) if (a.modalidad === modalidad && a.id !== salvoId && a.valor > 0) v = a.valor;
+  return v;
+}
 /* ¿Se pisan dos turnos semanales? Tiene en cuenta los que cruzan la medianoche. */
 function sePisan(x, y) {
   for (const d of x.dias) for (const e of y.dias) for (const k of [-1, 0, 1]) {
@@ -643,7 +657,7 @@ function editarAsig(S, id, campo, valor, dia) {
     if (m == null) return 'Escribí una hora válida.';
     if (campo === 'ti') { cand.ti = m; cand.tf = finRel(m, a.tf % 1440); } else cand.tf = finRel(a.ti, m);
   }
-  else if (campo === 'modalidad') { if (valor !== a.modalidad) { cand.modalidad = valor; cand.valor = S.ref[valor] || cand.valor; } }
+  else if (campo === 'modalidad') { if (valor !== a.modalidad) { cand.modalidad = valor; cand.valor = valorSugerido(S, valor, id) || cand.valor; } }
   else if (campo === 'valor') cand.valor = Math.round(Number(valor));
   else if (campo === 'activa') cand.activa = !!valor;
   else if (campo === 'dia') {

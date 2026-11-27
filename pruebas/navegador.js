@@ -4,9 +4,9 @@ const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');
 
-/* Sin variable, prueba el archivo único del artefacto. Con SITIO_URL, la misma recorrida sobre el sitio servido por HTTP. */
-const archivo = process.env.SITIO_URL || 'file://' + path.join(__dirname, '..', 'index.html');
-const salida = path.join(__dirname, '..', process.env.SITIO_URL ? 'capturas-sitio' : 'capturas');
+/* Prueba la demo: el archivo único con datos de ejemplo. La versión real, la que se publica, se recorre con pruebas/real.js. */
+const archivo = 'file://' + path.join(__dirname, '..', 'index.html');
+const salida = path.join(__dirname, '..', 'capturas');
 fs.mkdirSync(salida, { recursive: true });
 for (const f of fs.readdirSync(salida)) fs.unlinkSync(path.join(salida, f));
 

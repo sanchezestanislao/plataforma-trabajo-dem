@@ -4,6 +4,8 @@
 
 let S = null;
 let avisoT = null;
+/* El sitio publicado define CONFIG (servidor y llave pública): ahí corre la versión real, con real.js. Sin CONFIG, es la demo. */
+const REAL = typeof CONFIG !== 'undefined';
 const RUTAS = ['colaborador', 'supervisor', 'administracion'];
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -22,15 +24,20 @@ const FESTEJOS = [
   ['Gracias, {n}', 'Otro día bien hecho. Nos vemos en el próximo turno.'],
   ['Listo, {n}', 'Hoy salió todo en orden. Que disfrutes tu descanso.']
 ];
-const METODO = { qr: 'QR y ubicación', supervisor: 'asistida por supervisor', auto: 'cierre automático' };
+const METODO = REAL
+  ? { qr: 'QR de la sede', codigo: 'código de la pantalla', impreso: 'QR impreso', ubicacion: 'ubicación del teléfono', supervisor: 'asistida por supervisor', auto: 'cierre automático', declarada: 'avisada por la persona' }
+  : { qr: 'QR y ubicación', supervisor: 'asistida por supervisor', auto: 'cierre automático' };
 const LETRA_DIA = { 1: 'L', 2: 'M', 3: 'M', 4: 'J', 5: 'V', 6: 'S', 7: 'D' };
 const LIC_CORTA = { vacaciones: 'Vacac.', licencia: 'Licencia', franco: 'Franco' };
 const nb = t => String(t).replace(/ /g, '&nbsp;');
-const ADMIN_TABS = [['cronograma', 'Cronograma'], ['personal', 'Personal y asignaciones'], ['licencias', 'Licencias y vacaciones'], ['feriados', 'Feriados'], ['reglas', 'Reglas'], ['preliquidacion', 'Preliquidación']];
+const ADMIN_TABS = REAL
+  ? [['cronograma', 'Cronograma'], ['personas', 'Personas'], ['personal', 'Asignaciones'], ['sedes', 'Sedes'], ['licencias', 'Licencias y vacaciones'], ['feriados', 'Feriados'], ['reglas', 'Reglas'], ['preliquidacion', 'Preliquidación']]
+  : [['cronograma', 'Cronograma'], ['personal', 'Personal y asignaciones'], ['licencias', 'Licencias y vacaciones'], ['feriados', 'Feriados'], ['reglas', 'Reglas'], ['preliquidacion', 'Preliquidación']];
 
 /* ---------- Estado en el navegador ---------- */
 
 function guardar() {
+  if (REAL) return;
   try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento, la demo sigue en memoria */ }
 }
 function valido(o) {
@@ -53,6 +60,7 @@ function aviso(t) {
 }
 function ruta() {
   const h = location.hash.replace('#', '');
+  if (REAL) { const p = rutasPermitidas(); return p.indexOf(h) >= 0 ? h : rutaInicial(); }
   return RUTAS.indexOf(h) >= 0 ? h : 'colaborador';
 }
 
@@ -89,7 +97,7 @@ function rango(desde, hasta) {
 }
 function modTexto(m) { return m === 'hora' ? 'Por hora' : 'Fijo'; }
 function sedesOp(sel, lista) {
-  return (lista || S.sedes).map(s => '<option value="' + s.id + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.nombre) + '</option>').join('');
+  return (lista || S.sedes.filter(s => s.activa !== false || s.id === sel)).map(s => '<option value="' + s.id + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.nombre) + '</option>').join('');
 }
 function modOp(sel) {
   return '<option value="fijo"' + (sel === 'fijo' ? ' selected' : '') + '>Fijo</option><option value="hora"' + (sel === 'hora' ? ' selected' : '') + '>Por hora</option>';
@@ -109,10 +117,10 @@ function pillFeriado(f) {
 
 function vistaColab() {
   const c = colabSel(S);
-  if (!c) return '<div class="pagina"><p class="vacio">No hay colaboradores con asignaciones activas. Agregá una desde Administración.</p></div>';
+  if (!c) return '<div class="pagina"><p class="vacio">' + (REAL ? 'Todavía no tenés turnos asignados. Cuando administración cargue tu asignación, tu turno aparece acá.' : 'No hay colaboradores con asignaciones activas. Agregá una desde Administración.') + '</p></div>';
   const tabs = [['hoy', 'Hoy'], ['jornadas', 'Mis jornadas'], ['novedades', 'Novedades'], ['capacitacion', 'Capacitación']];
   const cuerpo = S.ui.tab === 'jornadas' ? jornadasHtml(c) : S.ui.tab === 'novedades' ? novedadesColabHtml(c) : S.ui.tab === 'capacitacion' ? capacitacionHtml(c) : hoyHtml(c);
-  return '<div class="demo-colab">' +
+  return '<div class="' + (REAL ? 'app-colab' : 'demo-colab') + '">' +
     '<div class="telefono">' +
       '<div class="cabecera-app"><p class="fecha-app">' + cap(fechaLarga(S.hoy)) + ', ' + hm(S.ahora) + '</p><h1>Hola, ' + esc(c.nombre) + '</h1></div>' +
       '<div class="pantalla" id="pantalla">' + cuerpo + '</div>' +
@@ -120,11 +128,18 @@ function vistaColab() {
         tabs.map(t => '<button type="button" data-a="tab" data-tab="' + t[0] + '" id="tab-' + t[0] + '"' + (S.ui.tab === t[0] ? ' aria-current="true"' : '') + '>' + ICONOS[t[0]] + '<span>' + t[1] + '</span></button>').join('') +
       '</nav>' +
     '</div>' +
-    '<aside class="guia">' + guiaHtml(c) + '</aside>' +
+    (REAL ? '' : '<aside class="guia">' + guiaHtml(c) + '</aside>') +
   '</div>';
 }
 
 function hoyHtml(c) {
+  if (REAL && S.ui.fichaje) {
+    const f = fichajeHtml();
+    if (f) return f;
+    /* El turno que se estaba fichando ya no existe (cambió la asignación): se vuelve a la pantalla de hoy. */
+    cerrarCamara();
+    S.ui.fichaje = null;
+  }
   const ts = tramosHoy(S, c.id);
   const pend = pendienteDeclarar(S, c.id);
   const fer = feriadoEl(S, S.hoy);
@@ -172,6 +187,16 @@ function olvidoHtml(j) {
 function sinEntradaHtml(j, e) {
   let n = '';
   if (e.enVivo) n = '<p class="nota ' + (e.estado === 'rojo' ? 'falta' : 'obs') + '">Tu turno empezó a las ' + hm(j.ti) + '. Marcá la entrada apenas llegues.</p>';
+  if (REAL) {
+    const modo = sedeDe(j).verificacion;
+    return '<section class="bloque">' +
+      '<div><p class="sede">' + esc(sedeNombre(S, j.sede)) + '</p><p class="turno-txt">Tu turno es de ' + hm(j.ti) + ' a ' + hm(j.tf) + '.</p></div>' + n +
+      '<button class="btn primario ancho" type="button" data-a="entrada" id="btn-entrada">Marcar entrada</button>' +
+      '<p class="ayuda">' + (modo === 'ubicacion' ? 'Al marcar, la aplicación usa la ubicación de tu teléfono para confirmar que estás en la sede.'
+        : modo === 'impreso' ? 'Al marcar, vas a leer el QR que está pegado en la sede. La hora la pone el sistema.'
+        : 'Al marcar, vas a leer el código de la pantalla de la sede. La hora la pone el sistema.') + '</p>' +
+    '</section>';
+  }
   return '<section class="bloque">' +
     '<div><p class="sede">' + esc(sedeNombre(S, j.sede)) + '</p><p class="turno-txt">Tu turno es de ' + hm(j.ti) + ' a ' + hm(j.tf) + '.</p></div>' + n +
     '<div class="qr-caja">' + qrSvg() + '<p>QR de ' + esc(sedeNombre(S, j.sede)) + '</p></div>' +
@@ -219,6 +244,7 @@ function formCierreHtml(j) {
     medio +
     '<p class="error" role="alert">' + esc(k.error || '') + '</p>' +
     '<button class="btn primario ancho" type="submit" id="btn-cerrar">Cerrar jornada</button>' +
+    (REAL ? '<p class="ayuda">Al cerrar, la aplicación te pide el código de la sede y registra la salida con la hora del sistema.</p>' : '') +
     '<button class="btn ancho" type="button" data-a="cancelar-cierre" id="btn-cancelar-cierre">Volver</button>' +
   '</form>';
 }
@@ -270,7 +296,7 @@ function cerradaHtml(c, j, e) {
     '<div class="semaforo-v" aria-hidden="true">' + focos + '</div>' +
     '<h2>' + titulo + '</h2>' +
     '<p class="mensaje">' + esc(msj) + '</p>' +
-    '<p class="resultado">' + chip(e.estado) + '<span>' + esc(e.detalle) + ', de ' + hm(j.entrada) + ' a ' + hm(j.salida) + ' en ' + esc(sede) + '</span></p>' +
+    '<p class="resultado">' + chip(e.estado) + '<span>' + esc(e.detalle) + (j.salida == null ? ', con entrada a las ' + hm(j.entrada) : ', de ' + hm(j.entrada) + ' a ' + hm(j.salida)) + ' en ' + esc(sede) + '</span></p>' +
     lineaRacha +
     '<div class="acciones">' + botones + '</div>' +
   '</section>';
@@ -333,7 +359,7 @@ function novedadesColabHtml(c) {
       '<fieldset class="campo"><legend>Urgencia</legend><div class="segmento">' +
         Object.keys(CRITICIDAD).map(k => '<label><input type="radio" name="nov-crit" id="nov-crit-' + k + '" value="' + k + '" data-draft="novCrit"' + (k === crit ? ' checked' : '') + '><span>' + CRITICIDAD[k] + '</span></label>').join('') + '</div></fieldset>' +
       '<label class="campo" for="nov-texto">¿Qué pasó?<textarea id="nov-texto" data-draft="novTexto" rows="3" maxlength="400" placeholder="Se rompió el secador de manos del baño de planta baja">' + esc(d.novTexto || '') + '</textarea></label>' +
-      '<label class="campo" for="nov-foto">Foto, si ayuda a entenderlo<input type="file" id="nov-foto" accept="image/*"></label>' +
+      (REAL ? '' : '<label class="campo" for="nov-foto">Foto, si ayuda a entenderlo<input type="file" id="nov-foto" accept="image/*"></label>') +
       '<p class="error" role="alert">' + esc(S.ui.errores.nov || '') + '</p>' +
       '<button class="btn primario ancho" type="submit" id="btn-nov">Enviar novedad</button>' +
     '</form>' +
@@ -436,8 +462,8 @@ function detalleHtml(j) {
   if (!j.justif) {
     p.push('Turno de ' + hm(j.ti) + ' a ' + hm(j.tf) + ' en ' + esc(sedeNombre(S, j.sede)) + '.');
     if (fer) p.push((fer.tipo === 'feriado' ? 'Feriado: ' : 'Día no laborable: ') + esc(fer.nombre) + '.');
-    if (j.entrada != null) p.push('Entrada ' + hm(j.entrada) + ' (' + (METODO[j.metodoIn] || METODO.qr) + ').');
-    if (j.cerrada && j.entrada != null) p.push(j.salida == null ? 'Salida sin marcar (cierre automático).' : 'Salida ' + hm(j.salida) + ' (' + (METODO[j.metodoOut] || METODO.qr) + ').');
+    if (j.entrada != null) p.push('Entrada ' + hm(j.entrada) + ' (' + (METODO[j.metodoIn] || METODO.qr) + (REAL ? esc(evidenciaTexto(j.ubiIn)) : '') + ').');
+    if (j.cerrada && j.entrada != null) p.push(j.salida == null ? (j.metodoOut === 'declarada' ? 'Salida sin marcar: la persona avisó la hora.' : 'Salida sin marcar (cierre automático).') : 'Salida ' + hm(j.salida) + ' (' + (METODO[j.metodoOut] || METODO.qr) + (REAL ? esc(evidenciaTexto(j.ubiOut)) : '') + ').');
     if (j.rev && j.salidaVal != null && j.salidaVal !== j.salida) p.push('Salida validada por supervisión: ' + hm(j.salidaVal) + '.');
     if (j.decl) p.push('Declaración: ' + esc(declTexto(j)));
     if (j.descargo) p.push('Aviso del colaborador: ' + esc(j.descargo));
@@ -495,8 +521,8 @@ function vistaSupervisor() {
     let accion = '';
     if (!j.cerrada && !j.justif) accion = '<button class="btn chico" type="button" data-a="asistido" data-j="' + j.id + '" id="asis-' + j.id + '">' + (j.entrada == null ? 'Fichar entrada' : 'Fichar salida') + '</button>';
     return '<tr><td><span class="nombre">' + esc(nombreCompleto(c)) + '</span></td><td>' + esc(sedeNombre(S, j.sede)) + '</td><td>' + hm(j.ti) + ' a ' + hm(j.tf) + (j.f !== S.hoy ? ', desde ayer' : '') + '</td>' +
-      '<td>' + (j.justif ? 'No ficha' : j.entrada == null ? 'Pendiente' : hm(j.entrada) + (j.metodoIn === 'supervisor' ? ', asistida' : '')) + '</td>' +
-      '<td>' + (j.justif ? 'No ficha' : j.salida == null ? (j.cerrada && j.entrada != null ? 'Sin marcar' : 'Pendiente') : hm(j.salida) + (j.metodoOut === 'supervisor' ? ', asistida' : '')) + '</td>' +
+      '<td>' + (j.justif ? 'No ficha' : j.entrada == null ? 'Pendiente' : hm(j.entrada) + (j.metodoIn === 'supervisor' ? ', asistida' : '') + (REAL ? respaldoCorto(j.ubiIn) : '')) + '</td>' +
+      '<td>' + (j.justif ? 'No ficha' : j.salida == null ? (j.cerrada && j.entrada != null ? 'Sin marcar' : 'Pendiente') : hm(j.salida) + (j.metodoOut === 'supervisor' ? ', asistida' : '') + (REAL ? respaldoCorto(j.ubiOut) : '')) + '</td>' +
       '<td><span class="estado-celda">' + chip(e.estado) + '<span>' + esc(e.detalle) + '</span></span></td><td class="num">' + accion + '</td></tr>';
   }).join('');
 
@@ -509,7 +535,7 @@ function vistaSupervisor() {
   }).join('');
 
   const bit = S.bitacora.slice(0, 6).map(b => '<li class="renglon dos"><div><p>' + esc(cap(b.texto)) + '</p><p class="sub">Supervisión, ' + fechaCorta(b.f) + ' ' + hm(b.m) + '</p></div>' +
-    (b.tipo === 'asistido' ? '<span></span>' : '<div class="renglon-accion"><button class="btn chico" type="button" data-a="deshacer" data-b="' + b.id + '" id="des-' + b.id + '">Deshacer</button></div>') + '</li>').join('');
+    (b.tipo === 'rev' || b.tipo === 'justif' ? '<div class="renglon-accion"><button class="btn chico" type="button" data-a="deshacer" data-b="' + b.id + '" id="des-' + b.id + '">Deshacer</button></div>' : '<span></span>') + '</li>').join('');
 
   const avisos = S.avisos.map(x => '<li class="renglon dos"><div><p>' + esc(x.texto) + '</p><p class="sub">Administración, ' + fechaCorta(x.f) + ' ' + hm(x.m) + '</p></div>' +
     '<div class="renglon-accion"><button class="btn chico" type="button" data-a="quitar-aviso" data-id="' + x.id + '" id="av-' + x.id + '">Visto</button></div></li>').join('');
@@ -523,6 +549,7 @@ function vistaSupervisor() {
       '<li><b>' + novAb + '</b><span>' + (novAb === 1 ? 'novedad abierta' : 'novedades abiertas') + '</span></li>' +
     '</ul>' +
     (avisos ? '<section class="seccion"><h2>Avisos de administración</h2><p class="bajada">Cambios de tope y asignaciones que lo superan. Quedan acá hasta que los marques como vistos.</p><ul class="panel">' + avisos + '</ul></section>' : '') +
+    (REAL ? marcasHtml() : '') +
     '<section class="seccion"><h2>Control excedente de horas</h2><p class="bajada">Cada turno con tiempo de más o sin salida espera acá. Hasta que lo resuelvas no suma horas a la liquidación. En una misma sede, el tiempo de más siempre es hora extra.</p>' +
       '<ul class="panel">' + (pend.length ? pend.map(casoHtml).join('') : '<li class="vacio">No hay turnos para resolver. Todo el tiempo trabajado está validado.</li>') + '</ul></section>' +
     '<section class="seccion"><h2>Equipo de hoy</h2><div class="panel tabla-wrap"><table><thead><tr><th>Colaborador</th><th>Sede</th><th>Turno</th><th>Entrada</th><th>Salida</th><th>Estado</th><th class="num">Fichaje asistido</th></tr></thead><tbody>' +
@@ -541,9 +568,13 @@ function vistaSupervisor() {
 
 function vistaAdmin() {
   const t = ADMIN_TABS.some(x => x[0] === S.ui.admin) ? S.ui.admin : 'cronograma';
-  const cuerpo = t === 'personal' ? adminPersonal() : t === 'licencias' ? adminLicencias() : t === 'feriados' ? adminFeriados() : t === 'reglas' ? adminReglas() : t === 'preliquidacion' ? adminLiquidacion() : adminCronograma();
+  const sinSedes = REAL && !S.sedes.length && (t === 'cronograma' || t === 'personal');
+  const cuerpo = sinSedes ? '<p class="panel vacio">Primero cargá una sede en la pestaña Sedes.</p>'
+    : t === 'personas' ? adminPersonas() : t === 'sedes' ? adminSedes()
+    : t === 'personal' ? adminPersonal() : t === 'licencias' ? adminLicencias() : t === 'feriados' ? adminFeriados() : t === 'reglas' ? adminReglas() : t === 'preliquidacion' ? adminLiquidacion() : adminCronograma();
   return '<div class="pagina">' +
     '<div class="titulo-pagina"><h1>Administración</h1><p>' + cap(fechaLarga(S.hoy)) + ', ' + hm(S.ahora) + '</p></div>' +
+    (REAL ? primerosPasosHtml() : '') +
     '<nav class="subtabs" aria-label="Secciones de administración">' +
       ADMIN_TABS.map(x => '<button type="button" data-a="admin" data-tab="' + x[0] + '" id="adm-' + x[0] + '"' + (x[0] === t ? ' aria-current="true"' : '') + '>' + x[1] + '</button>').join('') +
     '</nav>' + cuerpo +
@@ -652,7 +683,7 @@ function adminCronograma() {
       '</div></section>' +
     '<section class="seccion"><h2>Horario contratado en ' + esc(sedeNombre(S, sede)) + '</h2><p class="bajada">Lo que el cliente contrató: días, franja horaria y cuántas personas tienen que estar. Si la hora de fin no es posterior a la de inicio, la franja termina al día siguiente.</p>' +
       '<div class="panel"><ul>' + (filasFr || '<li class="vacio">Esta sede todavía no tiene horario contratado.</li>') + '</ul>' + formFr + '</div></section>' +
-    '<section class="seccion"><h2>Franjas sin cubrir en las próximas cuatro semanas</h2><p class="bajada">Todas las sedes, desde hoy. Se cubren con una asignación nueva o una cobertura con fecha desde Personal y asignaciones.</p>' +
+    '<section class="seccion"><h2>Franjas sin cubrir en las próximas cuatro semanas</h2><p class="bajada">Todas las sedes, desde hoy. Se cubren con una asignación nueva o una cobertura con fecha desde ' + (REAL ? 'Asignaciones' : 'Personal y asignaciones') + '.</p>' +
       '<ul class="panel">' + (hs || '<li class="vacio">Todo el horario contratado está cubierto.</li>') + '</ul></section>';
 }
 
@@ -665,7 +696,7 @@ function adminPersonal() {
       const at = 'data-asig="' + a.id + '"';
       const vig = a.desde || a.hasta ? (a.desde && a.hasta ? cap(rango(a.desde, a.hasta)) : a.desde ? 'Desde el ' + fechaMedia(a.desde) : 'Hasta el ' + fechaMedia(a.hasta)) : 'Permanente';
       filas += '<tr>' +
-        '<td>' + (i === 0 ? '<input type="text" id="c-nombre-' + c.id + '" data-colab="' + c.id + '" value="' + n + '" maxlength="60" aria-label="Nombre">' : '<span class="mismo">' + n + '</span>') + '</td>' +
+        '<td>' + (i === 0 && !REAL ? '<input type="text" id="c-nombre-' + c.id + '" data-colab="' + c.id + '" value="' + n + '" maxlength="60" aria-label="Nombre">' : (REAL && i === 0 ? '<span class="nombre">' + n + '</span>' : '<span class="mismo">' + (REAL ? '' : n) + '</span>')) + '</td>' +
         '<td><select id="a-sede-' + a.id + '" ' + at + ' data-campo="sede" aria-label="Sede">' + sedesOp(a.sede) + '</select></td>' +
         '<td>' + diasHtml('a-dia-' + a.id, at + ' data-campo="dia"', a.dias) + '</td>' +
         '<td><span class="par"><input type="time" id="a-ti-' + a.id + '" ' + at + ' data-campo="ti" value="' + hm(a.ti) + '" aria-label="Inicio del turno"><span>a</span><input type="time" id="a-tf-' + a.id + '" ' + at + ' data-campo="tf" value="' + hm(a.tf) + '" aria-label="Fin del turno"></span></td>' +
@@ -677,24 +708,25 @@ function adminPersonal() {
     });
   }
   const al = alertas(S);
-  const selC = d.asigColab || 'nuevo', mod = d.asigMod || 'hora';
+  const elegibles = S.colabs.filter(c => c.activa !== false);
+  const selC = d.asigColab || (REAL ? (elegibles[0] || {}).id : 'nuevo'), mod = d.asigMod || 'hora';
   const form = '<form class="form-alta" data-form="asig" novalidate>' +
-    '<label class="campo" for="as-colab">Colaborador<select id="as-colab" data-draft="asigColab"><option value="nuevo"' + (selC === 'nuevo' ? ' selected' : '') + '>Nuevo colaborador</option>' +
-      S.colabs.map(c => '<option value="' + c.id + '"' + (c.id === selC ? ' selected' : '') + '>' + esc(nombreCompleto(c)) + '</option>').join('') + '</select></label>' +
+    '<label class="campo" for="as-colab">Colaborador<select id="as-colab" data-draft="asigColab">' + (REAL ? '' : '<option value="nuevo"' + (selC === 'nuevo' ? ' selected' : '') + '>Nuevo colaborador</option>') +
+      elegibles.map(c => '<option value="' + c.id + '"' + (c.id === selC ? ' selected' : '') + '>' + esc(nombreCompleto(c)) + '</option>').join('') + '</select></label>' +
     (selC === 'nuevo' ? '<label class="campo" for="as-nombre">Nombre y apellido<input type="text" id="as-nombre" data-draft="asigNombre" maxlength="60" value="' + esc(d.asigNombre || '') + '"></label>' : '') +
-    '<label class="campo" for="as-sede">Sede<select id="as-sede" data-draft="asigSede">' + sedesOp(d.asigSede || S.sedes[0].id) + '</select></label>' +
+    '<label class="campo" for="as-sede">Sede<select id="as-sede" data-draft="asigSede">' + sedesOp(d.asigSede || (S.sedes.filter(s => s.activa !== false)[0] || S.sedes[0]).id) + '</select></label>' +
     '<fieldset class="campo"><legend>Días</legend>' + diasHtml('as-dia', 'data-draftdia="asigDias" data-base="5"', borradorDias('asigDias', [1, 2, 3, 4, 5])) + '</fieldset>' +
     '<label class="campo" for="as-ti">Turno desde<input type="time" id="as-ti" data-draft="asigTi" value="' + esc(d.asigTi || '08:00') + '"></label>' +
     '<label class="campo" for="as-tf">Turno hasta<input type="time" id="as-tf" data-draft="asigTf" value="' + esc(d.asigTf || '14:00') + '"></label>' +
     '<label class="campo" for="as-mod">Modalidad de pago<select id="as-mod" data-draft="asigMod">' + modOp(mod) + '</select></label>' +
-    '<label class="campo" for="as-valor">' + (mod === 'hora' ? 'Valor hora' : 'Monto fijo mensual') + '<input type="number" id="as-valor" data-draft="asigValor" min="1" step="100" value="' + esc(d.asigValor || S.ref[mod]) + '"></label>' +
+    '<label class="campo" for="as-valor">' + (mod === 'hora' ? 'Valor hora' : 'Monto fijo mensual') + '<input type="number" id="as-valor" data-draft="asigValor" min="1" step="100" value="' + esc(d.asigValor || valorSugerido(S, mod) || '') + '"></label>' +
     '<label class="campo" for="as-desde">Vigente desde, opcional<input type="date" id="as-desde" data-draft="asigDesde" value="' + esc(d.asigDesde || '') + '"></label>' +
     '<label class="campo" for="as-hasta">Vigente hasta, opcional<input type="date" id="as-hasta" data-draft="asigHasta" value="' + esc(d.asigHasta || '') + '"></label>' +
     '<button class="btn primario" type="submit" id="btn-asig">Agregar asignación</button>' +
     '<p class="error" role="alert">' + esc(S.ui.errores.asig || '') + '</p>' +
   '</form>';
-  return '<section class="seccion"><h2>Personal y asignaciones</h2><p class="bajada">Una asignación es una persona en una sede, con sus días, su turno y su modalidad de pago. Quien trabaja en dos sedes tiene dos, y cada una puede ser fija o por hora. En una misma sede hay una sola: el tiempo de más ahí es hora extra. Un turno que termina antes de la hora en que empieza cruza la medianoche.</p>' +
-    '<div class="panel"><div class="tabla-wrap"><table class="tabla-edit"><thead><tr><th>Colaborador</th><th>Sede</th><th>Días</th><th>Turno asignado</th><th>Modalidad</th><th>Valor de ejemplo</th><th>Vigencia</th><th>Activa</th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
+  return '<section class="seccion"><h2>' + (REAL ? 'Asignaciones' : 'Personal y asignaciones') + '</h2><p class="bajada">' + (REAL ? 'Las personas se dan de alta en la pestaña Personas. ' : '') + 'Una asignación es una persona en una sede, con sus días, su turno y su modalidad de pago. Quien trabaja en dos sedes tiene dos, y cada una puede ser fija o por hora. En una misma sede hay una sola: el tiempo de más ahí es hora extra. Un turno que termina antes de la hora en que empieza cruza la medianoche.</p>' +
+    '<div class="panel"><div class="tabla-wrap"><table class="tabla-edit"><thead><tr><th>Colaborador</th><th>Sede</th><th>Días</th><th>Turno asignado</th><th>Modalidad</th><th>' + (REAL ? 'Valor' : 'Valor de ejemplo') + '</th><th>Vigencia</th><th>Activa</th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
     (al.length ? '<ul class="alertas">' + al.map(x => '<li class="nota obs">' + esc(x.texto) + '</li>').join('') + '</ul>' : '') +
     form + '</div></section>';
 }
@@ -795,21 +827,24 @@ function adminLiquidacion() {
   return '<section class="seccion"><h2>Preliquidación de ' + nombreMes(S.hoy) + '</h2><p class="bajada">Turnos cerrados hasta el ' + fechaLarga(S.hoy) + ', una línea por asignación. Las horas en feriado y en día no laborable se cuentan aparte: en las asignaciones por hora suman el recargo definido en Feriados, y en las fijas quedan según convenio.</p>' +
     '<div class="panel"><div class="tabla-wrap"><table class="tabla-liq"><thead><tr><th>Colaborador y asignación</th><th>Semáforo del mes</th><th class="num">Horas asignadas</th><th class="num">Horas validadas</th><th class="num">En feriado</th><th class="num">Extra verificadas</th><th class="num">En revisión</th><th class="num">Inasistencias</th><th class="num">Base estimada</th></tr></thead><tbody>' + filas + '</tbody>' +
     '<tfoot><tr><td colspan="8">Base estimada del equipo</td><td class="num"><strong>' + ARS.format(total) + '</strong></td></tr></tfoot></table></div>' +
-    '<p class="pie-tabla">Valores de ejemplo. La base de una asignación por hora son sus horas validadas por el valor hora, más el recargo de feriado. La de una fija es su monto mensual: su liquidación va según convenio y queda para definir. Tampoco suman todavía la hora extra ni el descuento por inasistencia, que figuran aparte.</p></div></section>';
+    '<p class="pie-tabla">' + (REAL ? '' : 'Valores de ejemplo. ') + 'La base de una asignación por hora son sus horas validadas por el valor hora, más el recargo de feriado. La de una fija es su monto mensual: su liquidación va según convenio y queda para definir. Tampoco suman todavía la hora extra ni el descuento por inasistencia, que figuran aparte.</p></div></section>';
 }
 
 /* ---------- Dibujo ---------- */
 
 function render() {
+  if (REAL && !antesDeDibujar()) return;
   if (!S) return;
   const act = document.activeElement && document.activeElement.id;
   const sc = $('#pantalla'), top = sc ? sc.scrollTop : 0;
   const r = ruta();
-  $('#reloj-fecha').textContent = cap(fechaLarga(S.hoy));
-  $('#reloj-hora').value = hm(S.ahora);
-  document.querySelectorAll('.roles a').forEach(a => {
-    if (a.getAttribute('href') === '#' + r) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-  });
+  if (!REAL) {
+    $('#reloj-fecha').textContent = cap(fechaLarga(S.hoy));
+    $('#reloj-hora').value = hm(S.ahora);
+    document.querySelectorAll('.roles a').forEach(a => {
+      if (a.getAttribute('href') === '#' + r) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+  }
   $('#vista').innerHTML = r === 'supervisor' ? vistaSupervisor() : r === 'administracion' ? vistaAdmin() : vistaColab();
   const sc2 = $('#pantalla');
   if (sc2) sc2.scrollTop = S.ui.arriba ? 0 : top;
@@ -820,6 +855,7 @@ function render() {
     if (el && el !== document.activeElement) { try { el.focus({ preventScroll: true }); } catch (e) { /* sin foco */ } }
   }
   guardar();
+  if (REAL) despuesDeDibujar();
 }
 
 function ponerHora(min) {
@@ -828,6 +864,26 @@ function ponerHora(min) {
   S.ahora = Math.min(1439, min);
   tick(S);
   render();
+}
+/* Lo que la persona declara al cerrar. Si falta algo, deja el mensaje en `k.error` y devuelve null. */
+function datosCierre(j, k, d, val) {
+  const rel = relDe(S, j), exc = rel - j.tf;
+  k.error = '';
+  if (exc > S.P.margen) {
+    if (k.que === 'extra') return { conf: false, decl: { tipo: 'extra', hora: null, texto: String(d.cierreTexto || '').trim().slice(0, 200) } };
+    if (k.que === 'olvido') {
+      const h = aRel(j, aMin(val('cierre-hora')));
+      if (h == null) k.error = 'Indicá a qué hora terminaste.';
+      else if (h <= j.entrada || h > rel) k.error = 'La hora tiene que estar entre tu entrada y ahora.';
+      else return { conf: false, decl: { tipo: 'olvido', hora: h, texto: '' } };
+    } else k.error = 'Elegí qué pasó con el tiempo de más.';
+  } else if (k.otras) {
+    const t = String(d.cierreTexto || '').trim();
+    if (!t) k.error = 'Contanos qué fue distinto o volvé a confirmar tus horas.';
+    else return { conf: false, decl: { tipo: 'otras', hora: null, texto: t.slice(0, 200) } };
+  } else if (!k.ok) k.error = 'Confirmá tus horas antes de cerrar.';
+  else return { conf: true, decl: null };
+  return null;
 }
 function limpiarColab() { S.ui.cierre = null; S.ui.recien = null; S.ui.descargo = null; S.ui.errores = {}; S.ui.arriba = true; }
 function alternarDia(lista, dia, marcado) {
@@ -841,7 +897,9 @@ function alternarDia(lista, dia, marcado) {
 
 document.addEventListener('click', ev0 => {
   const b = ev0.target.closest('[data-a]');
-  if (!b || !S) return;
+  if (!b) return;
+  if (REAL && clicReal(b)) return;
+  if (!S) return;
   const a = b.dataset.a, c = colabSel(S);
   const act = c ? tramoActual(S, c.id) : null;
   let subir = false;
@@ -894,6 +952,7 @@ document.addEventListener('change', ev0 => {
   const t = ev0.target;
   if (!S || !t || !t.dataset) return;
   const ds = t.dataset;
+  if (REAL && cambioReal(t)) return;
   if (t.id === 'reloj-hora') { ponerHora(aMin(t.value)); return; }
   if (t.id === 'sel-colab') { elegirColab(S, t.value); limpiarColab(); render(); return; }
   if (t.name === 'que' && S.ui.cierre) { S.ui.cierre.que = t.value; S.ui.cierre.error = ''; render(); return; }
@@ -930,30 +989,17 @@ document.addEventListener('change', ev0 => {
 
 document.addEventListener('submit', ev0 => {
   const f = ev0.target.closest('form[data-form]');
-  if (!f || !S) return;
+  if (!f) return;
   ev0.preventDefault();
+  if (REAL) { envioReal(f); return; }
+  if (!S) return;
   const tipo = f.dataset.form, c = colabSel(S), d = S.ui.drafts;
   const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
   const limpiar = claves => claves.forEach(k => { delete d[k]; });
   if (tipo === 'cierre') {
     const j = c ? tramoActual(S, c.id) : null, k = S.ui.cierre;
     if (!j || j.entrada == null || !k) { render(); return; }
-    const rel = relDe(S, j), exc = rel - j.tf;
-    let datos = null;
-    if (exc > S.P.margen) {
-      if (k.que === 'extra') datos = { conf: false, decl: { tipo: 'extra', hora: null, texto: String(d.cierreTexto || '').trim().slice(0, 200) } };
-      else if (k.que === 'olvido') {
-        const h = aRel(j, aMin(val('cierre-hora')));
-        if (h == null) k.error = 'Indicá a qué hora terminaste.';
-        else if (h <= j.entrada || h > rel) k.error = 'La hora tiene que estar entre tu entrada y ahora.';
-        else datos = { conf: false, decl: { tipo: 'olvido', hora: h, texto: '' } };
-      } else k.error = 'Elegí qué pasó con el tiempo de más.';
-    } else if (k.otras) {
-      const t = String(d.cierreTexto || '').trim();
-      if (!t) k.error = 'Contanos qué fue distinto o volvé a confirmar tus horas.';
-      else datos = { conf: false, decl: { tipo: 'otras', hora: null, texto: t.slice(0, 200) } };
-    } else if (!k.ok) k.error = 'Confirmá tus horas antes de cerrar.';
-    else datos = { conf: true, decl: null };
+    const datos = datosCierre(j, k, d, val);
     if (datos) {
       const jc = cerrarJornada(S, j.id, datos);
       S.ui.cierre = null; S.ui.arriba = true;
@@ -1028,6 +1074,9 @@ function arrancar(previo) {
   colabSel(S);
   render();
 }
-if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => S);
-if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(arrancar);
-else arrancar((window.claude && window.claude.hot && window.claude.hot.data) || null);
+if (REAL) arrancarReal();
+else {
+  if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => S);
+  if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(arrancar);
+  else arrancar((window.claude && window.claude.hot && window.claude.hot.data) || null);
+}

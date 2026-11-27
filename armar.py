@@ -1,11 +1,12 @@
-"""Arma las dos salidas del prototipo a partir de src/.
+"""Arma las dos salidas a partir de src/.
 
-index.html   un solo archivo, para el artefacto de Claude.
-sitio/       la web publicable e instalable en el teléfono (cualquier hosting estático).
+index.html   la demo con datos de ejemplo, en un solo archivo, para el artefacto de Claude.
+sitio/       la versión real: la web publicable e instalable, conectada al servidor (cualquier hosting estático).
 """
 import hashlib
 import json
 import pathlib
+import re
 import shutil
 
 raiz = pathlib.Path(__file__).parent
@@ -17,16 +18,33 @@ def leer(nombre):
     return (src / nombre).read_text(encoding="utf-8")
 
 
-def armar(extra):
+def plantilla(real):
+    """La plantilla tiene partes solo de la demo (<!--DEMO-->…<!--/DEMO-->) y partes solo de la versión real (<!--REAL … REAL-->)."""
     html = leer("plantilla.html")
-    partes = {"/*ESTILOS*/": leer("estilos.css"), "/*LOGICA*/": leer("logica.js"), "/*VISTAS*/": leer("vistas.js")}
-    partes.update(extra)
+    if real:
+        html = re.sub(r"<!--DEMO-->.*?<!--/DEMO-->\n", "", html, flags=re.S)
+        html = re.sub(r"<!--REAL\n(.*?)REAL-->\n", r"\1", html, flags=re.S)
+    else:
+        html = re.sub(r"<!--REAL\n.*?REAL-->\n", "", html, flags=re.S)
+        html = html.replace("<!--DEMO-->\n", "").replace("<!--/DEMO-->\n", "")
+    assert "DEMO-->" not in html and "REAL-->" not in html and "<!--REAL" not in html
+    return html
+
+
+def poner(html, partes):
     for marca, texto in partes.items():
         assert html.count(marca) == 1, marca
         if marca.startswith("/*"):  # lo que va dentro de <style> o <script> no puede cerrarlos
             assert "</script" not in texto.lower() and "</style" not in texto.lower(), marca
         html = html.replace(marca, texto)
     return html
+
+
+def huella(*trozos):
+    h = hashlib.sha256()
+    for t in trozos:
+        h.update(t if isinstance(t, bytes) else t.encode("utf-8"))
+    return h.hexdigest()[:12]
 
 
 CABEZA = """<meta name="robots" content="noindex">
@@ -46,10 +64,12 @@ INSTALAR = """<section class="instalar" id="instalar" hidden aria-label="Instala
   <button class="btn chico" type="button" id="instalar-no">Ahora no</button>
 </section>"""
 
+# El navegador solo acepta código y datos de este sitio y del servidor de la plataforma.
 CABECERAS = """/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: geolocation=(self), camera=(self)
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' __SERVIDOR__; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 /
   Cache-Control: no-cache
 /sw.js
@@ -57,6 +77,10 @@ CABECERAS = """/*
 /manifest.webmanifest
   Cache-Control: no-cache
 /tipografia/*
+  Cache-Control: public, max-age=31536000, immutable
+/app.*
+  Cache-Control: public, max-age=31536000, immutable
+/qr.*
   Cache-Control: public, max-age=31536000, immutable
 """
 
@@ -87,9 +111,35 @@ def icono(lado, margen, redondeado):
     return im.resize((lado, lado), Image.LANCZOS)
 
 
+def armar_demo():
+    html = poner(plantilla(False), {
+        "<!--CABEZA-->\n": "", "<!--INSTALAR-->\n": "", "<!--GUION-->\n": "", "<!--/GUION-->\n": "",
+        "/*ESTILOS*/": leer("estilos.css"), "/*LOGICA*/": leer("logica.js"), "/*VISTAS*/": leer("vistas.js"),
+    })
+    (raiz / "index.html").write_text(html, encoding="utf-8")
+    return len(html.encode("utf-8"))
+
+
 def armar_sitio():
+    servidor = json.loads((raiz / "supabase" / "config.json").read_text(encoding="utf-8"))
+    assert servidor["url"].startswith("https://") and servidor["clave"].startswith("sb_publishable_"), "config.json: solo la llave pública"
     (sitio / "iconos").mkdir(parents=True, exist_ok=True)
-    html = armar({"<!--CABEZA-->": CABEZA, "<!--INSTALAR-->": INSTALAR, "/*SITIO*/": leer("sitio.js")})
+    for viejo in list(sitio.glob("app.*.js")) + list(sitio.glob("qr.*.js")):
+        viejo.unlink()
+
+    # El generador de QR va aparte: solo lo cargan la pantalla de la sede y administración.
+    qr = leer("terceros/qrcode-generator.js")
+    nombre_qr = "qr." + huella(qr) + ".js"
+    (sitio / nombre_qr).write_text(qr, encoding="utf-8")
+
+    config = {"url": servidor["url"], "clave": servidor["clave"], "qr": nombre_qr}
+    app = "\n".join(["const CONFIG = " + json.dumps(config) + ";", leer("logica.js"), leer("real.js"), leer("vistas.js"), leer("sitio.js")])
+    nombre_app = "app." + huella(app) + ".js"
+    (sitio / nombre_app).write_text(app, encoding="utf-8")
+
+    html = poner(plantilla(True), {"<!--CABEZA-->": CABEZA, "<!--INSTALAR-->": INSTALAR, "/*ESTILOS*/": leer("estilos.css")})
+    html, n = re.subn(r"<!--GUION-->.*?<!--/GUION-->", '<script src="' + nombre_app + '"></script>', html, flags=re.S)
+    assert n == 1 and "<script>" not in html
     viejo = "<title>Prototipo de fichaje y jornadas</title>"
     assert html.count(viejo) == 1
     html = html.replace(viejo, "<title>Plataforma de trabajo</title>")
@@ -121,22 +171,18 @@ def armar_sitio():
         assert not faltan, "Instalá Pillow (pip install pillow) para generar los íconos: " + ", ".join(faltan)
         print("aviso: sin Pillow, se conservan los íconos existentes")
 
-    base = ["./", "manifest.webmanifest", "tipografia/" + fuentes[0]] + ["iconos/" + n for n in iconos]
-    huella = hashlib.sha256()
-    for ruta in [sitio / "index.html", sitio / "manifest.webmanifest", sitio / "tipografia" / fuentes[0]] + [sitio / "iconos" / n for n in iconos]:
-        huella.update(ruta.read_bytes())
+    base = ["./", nombre_app, nombre_qr, "manifest.webmanifest", "tipografia/" + fuentes[0]] + ["iconos/" + n for n in iconos]
+    rutas = [sitio / "index.html", sitio / nombre_app, sitio / nombre_qr, sitio / "manifest.webmanifest", sitio / "tipografia" / fuentes[0]] + [sitio / "iconos" / n for n in iconos]
+    version = huella(*[r.read_bytes() for r in rutas])
     sw = leer("sw.js")
     assert sw.count("__VERSION__") == 1 and sw.count("__BASE__") == 1
-    sw = sw.replace("__VERSION__", huella.hexdigest()[:12]).replace("__BASE__", json.dumps(base))
-    (sitio / "sw.js").write_text(sw, encoding="utf-8")
+    (sitio / "sw.js").write_text(sw.replace("__VERSION__", version).replace("__BASE__", json.dumps(base)), encoding="utf-8")
 
-    (sitio / "_headers").write_text(CABECERAS, encoding="utf-8")
+    (sitio / "_headers").write_text(CABECERAS.replace("__SERVIDOR__", servidor["url"]), encoding="utf-8")
     (sitio / "robots.txt").write_text("User-agent: *\nDisallow: /\n", encoding="utf-8")
-    return len(html.encode("utf-8")), huella.hexdigest()[:12]
+    return len(html.encode("utf-8")), len(app.encode("utf-8")), version
 
 
-artefacto = armar({"<!--CABEZA-->\n": "", "<!--INSTALAR-->\n": "", "/*SITIO*/\n": ""})
-(raiz / "index.html").write_text(artefacto, encoding="utf-8")
-print("index.html", len(artefacto.encode("utf-8")), "bytes")
-peso, version = armar_sitio()
-print("sitio/index.html", peso, "bytes, versión", version)
+print("index.html (demo)", armar_demo(), "bytes")
+peso, peso_app, version = armar_sitio()
+print("sitio/index.html", peso, "bytes; aplicación", peso_app, "bytes; versión", version)
