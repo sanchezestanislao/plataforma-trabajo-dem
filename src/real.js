@@ -743,12 +743,15 @@ function leerUbicacion(texto, ref) {
 /* El enlace que da Google Maps al tocar Compartir. No trae la ubicación adentro: la busca el servidor. */
 function esEnlaceDeMaps(texto) { return /^(https?:\/\/)?(maps\.app\.goo\.gl\/|goo\.gl\/maps\/)\S+$/i.test(String(texto || '').trim()); }
 async function resolverEnlace(enlace) {
+  const cuerpo = { enlace: String(enlace).trim() };
   let r;
   try {
     let llave = await llaveVigente();
-    if (llave) r = await pedir('/functions/v1/ubicacion', { enlace: String(enlace).trim() }, llave);
-    if (llave && r.status === 401) { llave = await renovar(); if (llave) r = await pedir('/functions/v1/ubicacion', { enlace: String(enlace).trim() }, llave); }
-    if (!llave || r.status === 401) { alIngreso('Tu sesión se cerró. Ingresá de nuevo.'); return { error: '' }; }
+    if (llave) r = await pedir('/functions/v1/ubicacion', cuerpo, llave);
+    if (llave && r.status === 401) { llave = await renovar(); if (llave) r = await pedir('/functions/v1/ubicacion', cuerpo, llave); }
+    /* Sin sesión que renovar, a ingresar de nuevo. Si el lector de enlaces rechaza una sesión recién renovada, la falla es
+       del lector y no de la persona: sigue adentro, se le avisa y puede cargar las coordenadas. */
+    if (!llave) { alIngreso('Tu sesión se cerró. Ingresá de nuevo.'); return { error: '' }; }
   } catch (e) { return { error: 'Sin conexión. Revisá tu señal y probá de nuevo.' }; }
   const j = r.j || {};
   const u = r.ok && j.ok ? leerUbicacion(j.lat + ', ' + j.lon) : null;
