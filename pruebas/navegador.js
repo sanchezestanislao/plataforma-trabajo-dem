@@ -1,0 +1,455 @@
+'use strict';
+/* Abre el prototipo en Chrome, recorre los flujos principales y guarda capturas. */
+const path = require('path');
+const fs = require('fs');
+const { chromium } = require('playwright');
+
+/* Sin variable, prueba el archivo único del artefacto. Con SITIO_URL, la misma recorrida sobre el sitio servido por HTTP. */
+const archivo = process.env.SITIO_URL || 'file://' + path.join(__dirname, '..', 'index.html');
+const salida = path.join(__dirname, '..', process.env.SITIO_URL ? 'capturas-sitio' : 'capturas');
+fs.mkdirSync(salida, { recursive: true });
+for (const f of fs.readdirSync(salida)) fs.unlinkSync(path.join(salida, f));
+
+let ok = 0, mal = 0;
+function igual(real, esperado, nombre) {
+  if (real === esperado) ok++;
+  else { mal++; console.log('FALLA  ' + nombre + '\n   esperado ' + JSON.stringify(esperado) + '\n   real     ' + JSON.stringify(real)); }
+}
+function contiene(real, parte, nombre) {
+  if (String(real).indexOf(parte) >= 0) ok++;
+  else { mal++; console.log('FALLA  ' + nombre + '\n   debía contener ' + JSON.stringify(parte) + '\n   real           ' + JSON.stringify(String(real).slice(0, 500))); }
+}
+
+(async () => {
+  const browser = await chromium.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+  const ctx = await browser.newContext({ viewport: { width: 1320, height: 900 }, locale: 'es-AR' });
+  await ctx.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(8000);
+  const errores = [];
+  page.on('pageerror', e => errores.push('pageerror: ' + e.message));
+  page.on('console', m => { if (m.type() === 'error' && !/ERR_FAILED|Failed to load resource/.test(m.text())) errores.push('console: ' + m.text()); });
+  const txt = async s => ((await page.textContent(s)) || '').replace(/ /g, ' ').trim();
+  const cap = async (n, opt) => page.screenshot(Object.assign({ path: path.join(salida, n + '.png') }, opt || {}));
+  const hora = async h => { await page.fill('#reloj-hora', h); await page.locator('#reloj-hora').blur(); };
+  const sinDesborde = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  const telefono = { clip: { x: 0, y: 100, width: 760, height: 800 } };
+  const fila = t => page.locator('.panel table tbody tr', { hasText: t });
+  const plano = async loc => ((await loc.textContent()) || '').replace(/\u00a0/g, ' ');
+
+  await page.goto(archivo, { waitUntil: 'domcontentloaded' });
+  igual(await txt('.cabecera-app h1'), 'Hola, Marta', 'saludo inicial');
+  igual(await txt('#reloj-fecha'), 'Viernes 27 de noviembre', 'fecha del reloj');
+  igual(await txt('#reloj-dia'), 'Pasar al día siguiente', 'el reloj avanza de a un día, sin saltear fines de semana');
+  igual(await page.locator('.turnos-hoy li').count(), 2, 'Marta ve sus dos turnos de hoy');
+  await cap('01-colaborador');
+
+  // Primer turno: fijo en Sede Centro
+  await page.click('#btn-abrir-cierre');
+  await page.click('#btn-cerrar');
+  igual(await txt('form[data-form="cierre"] .error'), 'Confirmá tus horas antes de cerrar.', 'pide confirmar las horas');
+  await page.check('#cierre-ok');
+  await page.click('#btn-cerrar');
+  igual(await txt('.cierre-ok h2'), 'Muy bien, Marta', 'cierre del primer turno');
+  contiene(await txt('.mensaje'), 'Tu próximo turno de hoy empieza a las 15:00 en Sede Parque', 'anuncia el próximo turno');
+  await page.waitForTimeout(1100);
+  await cap('02-cierre-primer-turno', telefono);
+
+  // Segundo turno: por hora en Sede Parque
+  await page.click('#btn-proximo');
+  contiene(await txt('.pantalla'), 'QR de Sede Parque', 'pide fichar en la segunda sede');
+  await page.click('#pr-sede');
+  await page.click('#btn-entrada');
+  contiene(await txt('.pantalla'), 'Llegaste a horario', 'entrada a horario en la segunda sede');
+  await hora('18:02');
+  await page.click('#btn-abrir-cierre');
+  await page.check('#cierre-ok');
+  await page.click('#btn-cerrar');
+  igual(await txt('.cierre-ok h2'), 'Excelente, Marta', 'mensaje de fin de jornada');
+  contiene(await txt('.mensaje'), 'Terminamos otra jornada juntos', 'frase de cierre');
+  contiene(await txt('.racha'), '2 jornadas seguidas', 'racha con los dos turnos en verde');
+  await page.waitForTimeout(1100);
+  await cap('03-cierre-del-dia', telefono);
+
+  await page.click('#tab-jornadas');
+  igual(await page.locator('.lista-jornadas .fila').count(), 28, 'turnos de noviembre, con el feriado del 23 trabajado');
+  contiene(await txt('.lista-jornadas .fila >> nth=0'), 'Sede Parque', 'cada turno nombra su sede');
+  igual(await page.locator('.lista-jornadas .pill.fer').count(), 1, 'el turno del lunes 23 lleva la marca de feriado');
+  contiene(await page.locator('.lista-jornadas .fila', { hasText: 'Lun 23' }).textContent(), 'Feriado', 'y es la fila del 23');
+  await cap('04-mis-jornadas', telefono);
+  await page.locator('.lista-jornadas .enlace').first().click();
+  await page.fill('#descargo-txt', 'Hubo un corte en el recorrido del colectivo y no llegué a avisar.');
+  await page.click('#btn-descargo');
+  contiene(await txt('.lista-jornadas'), 'Tu aviso: Hubo un corte en el recorrido', 'descargo enviado');
+
+  await page.click('#tab-novedades');
+  igual(await page.locator('#nov-sede').inputValue(), 'parque', 'la novedad propone la sede donde está');
+  await page.click('#btn-nov');
+  igual(await txt('form[data-form="novedad"] .error'), 'Contá qué pasó antes de enviar.', 'valida la novedad');
+  await page.fill('#nov-texto', 'Falta papel en los baños del primer piso.');
+  await page.click('label:has(#nov-crit-alta)');
+  await page.click('#btn-nov');
+  contiene(await txt('.lista-nov'), 'Falta papel en los baños', 'novedad enviada');
+  await page.click('#tab-capacitacion');
+  contiene(await txt('.logros'), 'turnos cerrados por vos', 'pestaña de capacitación');
+
+  // Supervisor
+  await page.goto(archivo + '#supervisor');
+  await page.waitForSelector('.titulo-pagina h1');
+  igual(await page.locator('.caso').count(), 3, 'tres casos para resolver');
+  igual(await page.locator('.seccion table tbody tr').count(), 8, 'siete turnos de hoy y el nocturno que venía de ayer');
+  contiene(await page.locator('.seccion table tbody tr', { hasText: 'Hugo Luna' }).textContent(), '22:00 a 06:00, desde ayer', 'el turno de noche figura como iniciado ayer');
+  igual(await page.locator('.seccion h2', { hasText: 'Avisos de administración' }).count(), 0, 'sin avisos de administración al empezar');
+  await cap('05-supervisor', { fullPage: true });
+  const caso = n => page.locator('.caso', { hasText: n });
+  contiene(await caso('Marta Giménez').textContent(), 'limpieza profunda del salón', 'declaración de Marta');
+  contiene(await caso('Marta Giménez').textContent(), 'suma 8 h 40 min ese día, por encima del tope de 8 h', 'el caso avisa que supera el tope diario');
+  await caso('Marta Giménez').locator('button[type="submit"]').click();
+  contiene(await txt('#aviso'), 'en Sede Centro: hora extra verificada, 2 h 40 min', 'resolución de hora extra');
+  igual(await caso('Diego Rojas').locator('input[type="radio"]:checked').getAttribute('value'), 'olvido', 'sugiere olvido cuando no hay salida');
+  await caso('Diego Rojas').locator('input[value="extra"]').check();
+  await caso('Diego Rojas').locator('input[type="time"]').fill('12:30');
+  await caso('Diego Rojas').locator('button[type="submit"]').click();
+  contiene(await caso('Diego Rojas').locator('.error').textContent(), 'posterior a las 13:00', 'valida la hora extra');
+  await caso('Diego Rojas').locator('input[value="olvido"]').check();
+  await caso('Diego Rojas').locator('button[type="submit"]').click();
+  igual(await page.locator('.caso').count(), 1, 'queda un caso');
+  igual(await page.locator('.tablero .t-dia.fer').count(), 1, 'el tablero marca el feriado del 23');
+  await page.locator('button.t-luz').first().click();
+  contiene(await txt('#detalle-jornada'), 'Marta Giménez, lunes 2 de noviembre', 'detalle del tablero');
+  await page.locator('button[data-a="asistido"]').first().click();
+  contiene(await txt('#aviso'), 'asistida', 'fichaje asistido');
+  await page.locator('form[data-form="justificar"] button').first().click();
+  contiene(await txt('#aviso'), 'inasistencia justificada', 'justifica una inasistencia');
+  await page.locator('button[data-a="deshacer"]').first().click();
+  contiene(await txt('#aviso'), 'deshecha', 'deshace una resolución');
+  await page.selectOption('#est-n2', 'resuelta');
+  igual(await page.locator('#est-n2').inputValue(), 'resuelta', 'cambia el estado de una novedad');
+
+  // Administración: cronograma de siete días
+  await page.goto(archivo + '#administracion');
+  await page.waitForSelector('.grilla');
+  igual(await page.locator('.subtabs button').count(), 6, 'seis secciones de administración');
+  igual(await page.locator('.grilla .g-dia').count(), 7, 'la grilla muestra los siete días');
+  contiene(await txt('.semana-nav strong'), 'Semana del 23 al 29 de noviembre', 'semana en curso, de lunes a domingo');
+  contiene(await txt('.g-dia >> nth=0 >> .g-cab'), 'Feriado', 'el lunes 23 lleva la marca de feriado');
+  igual(await page.locator('.g-dia >> nth=0').locator('.g-pers').count(), 4, 'ese feriado igual tiene gente asignada: dos a la mañana y el turno de noche, que termina a las 6 y vuelve a las 22');
+  igual(await txt('.g-eje span >> nth=0'), '00:00', 'Centro se ve de 0 a 24');
+  igual(await page.locator('.g-dia.hoy .g-seg.falta').count(), 2, 'hoy faltan la tarde y la noche en Centro');
+  contiene(await txt('#sg-centro'), '7 días con franjas sin cubrir', 'resumen de la sede en la semana');
+  await cap('06-cronograma', { fullPage: true });
+  await page.click('#sem-sig');
+  contiene(await txt('.semana-nav strong'), 'Semana del 30 de noviembre al 6 de diciembre', 'semana siguiente');
+  igual(await page.locator('.g-pers.aus').count(), 5, 'Lucía aparece de vacaciones de lunes a viernes');
+  igual(await page.locator('.g-seg.falta').count(), 18, 'franjas sin cubrir de la semana en Centro');
+  await page.locator('.grilla-wrap').screenshot({ path: path.join(salida, '07-grilla-con-vacaciones.png') });
+  await page.click('#sem-sig');
+  contiene(await txt('.g-dia >> nth=0 >> .g-cab'), 'No laborable', 'el lunes 7 de diciembre figura como día no laborable');
+  contiene(await txt('.g-dia >> nth=1 >> .g-cab'), 'Feriado', 'y el martes 8 como feriado');
+  await page.locator('.grilla-wrap').screenshot({ path: path.join(salida, '08-grilla-feriados-diciembre.png') });
+  await page.click('#sem-ant');
+  await page.click('#sg-parque');
+  igual(await page.locator('.g-seg.falta').count(), 1, 'en Parque solo falta el día de la licencia');
+  igual(await page.locator('.g-pers.vertical').count(), 6, 'con tres personas a la vez, los nombres van en vertical');
+  await page.locator('.grilla-wrap').screenshot({ path: path.join(salida, '09-grilla-parque.png') });
+  igual(await page.locator('.fila-flex').count(), 2, 'Parque tiene dos franjas contratadas');
+  igual(await page.locator('.fila-flex >> nth=0').locator('.dias input').count(), 7, 'cada franja se define de lunes a domingo');
+  await page.fill('#nf-ti', '20:00');
+  await page.fill('#nf-tf', '22:00');
+  await page.uncheck('#nf-dia-5');
+  await page.click('#btn-franja');
+  igual(await page.locator('.fila-flex').count(), 3, 'franja contratada agregada');
+  igual(await page.locator('.g-seg.falta').count(), 7, 'la franja nueva queda sin cubrir los seis días que rige');
+  await page.fill('#nf-ti', '22:00');
+  await page.fill('#nf-tf', '06:00');
+  await page.click('#btn-franja');
+  igual(await page.locator('.fila-flex').count(), 4, 'una franja puede cruzar la medianoche');
+  contiene(await txt('.fila-flex >> nth=3'), 'Termina al día siguiente', 'y lo dice');
+  await page.locator('button[data-a="quitar-franja"]').last().click();
+  await page.fill('#fr-dot-f4', '3');
+  await page.locator('#fr-dot-f4').blur();
+  contiene(await txt('.g-dia >> nth=0'), '2/3', 'subir la dotación deja la franja corta');
+  await page.locator('button[data-a="quitar-franja"]').last().click();
+  igual(await page.locator('.fila-flex').count(), 2, 'franjas quitadas');
+  await page.locator('button[data-a="ver-hueco"]').first().click();
+  contiene(await txt('.semana-nav strong'), 'Semana del 23 al 29 de noviembre', 'ver en la grilla lleva a la semana del hueco');
+  igual(await page.locator('#sg-centro').getAttribute('aria-current'), 'true', 'y a su sede');
+
+  // Administración: personal, asignaciones y topes
+  await page.click('#adm-personal');
+  igual(await page.locator('.tabla-edit tbody tr').count(), 9, 'nueve asignaciones');
+  igual(await page.locator('.tabla-edit tbody tr >> nth=0').locator('.dias input').count(), 7, 'los días de una asignación van de lunes a domingo');
+  igual(await page.locator('#a-tf-a8').inputValue(), '06:00', 'el turno de noche muestra su hora de fin');
+  igual(await page.locator('.alertas').count(), 0, 'sin avisos de tope en los datos de ejemplo');
+  await cap('10-personal', { fullPage: true });
+  await page.selectOption('#as-colab', 'c2');
+  await page.selectOption('#as-sede', 'norte');
+  await page.fill('#as-ti', '14:00');
+  await page.fill('#as-tf', '18:00');
+  await page.click('#btn-asig');
+  contiene(await txt('form[data-form="asig"] .error'), 'En la misma sede, el tiempo de más se registra como hora extra', 'misma sede: hora extra');
+  igual(await page.locator('#as-ti').inputValue(), '14:00', 'el formulario conserva lo escrito');
+  await page.selectOption('#as-sede', 'centro');
+  await page.click('#btn-asig');
+  igual(await page.locator('.tabla-edit tbody tr').count(), 10, 'Diego suma una asignación en otra sede');
+  igual(await page.locator('.alertas').count(), 0, 'con 10 h queda justo en el tope de quien trabaja por hora');
+  const nuevaDiego = page.locator('.tabla-edit tbody tr >> nth=3');
+  await nuevaDiego.locator('input[data-campo="tf"]').fill('19:00');
+  await nuevaDiego.locator('input[data-campo="tf"]').blur();
+  contiene(await txt('#aviso'), 'supera el tope diario. Supervisión ya tiene el aviso', 'pasar el tope avisa');
+  contiene(await txt('.alertas'), 'Diego Rojas suma 11 h de lunes a viernes, por encima del tope de 10 h', 'y queda a la vista en administración');
+  await page.fill('#as-nombre', 'Ana Ruiz');
+  await page.selectOption('#as-mod', 'fijo');
+  igual(await page.locator('#as-valor').inputValue(), '950000', 'el alta propone el monto fijo');
+  igual(await page.locator('#as-nombre').inputValue(), 'Ana Ruiz', 'el alta conserva el nombre');
+  await page.fill('#as-desde', '2026-11-30');
+  await page.fill('#as-hasta', '2026-12-04');
+  await page.click('#btn-asig');
+  igual(await page.locator('.tabla-edit tbody tr').count(), 11, 'persona nueva con cobertura temporal');
+  contiene(await txt('.tabla-edit tbody tr >> nth=10'), 'Del 30 de noviembre al 4 de diciembre', 'muestra la vigencia');
+  await page.selectOption('#a-mod-a2', 'fijo');
+  igual(await page.locator('#a-valor-a2').inputValue(), '950000', 'cambiar modalidad cambia el valor de referencia');
+  await page.uncheck('#a-dia-a7-5');
+  igual(await page.locator('#a-dia-a7-5').isChecked(), false, 'quita un día de una asignación');
+  await page.selectOption('#a-sede-a7', 'centro');
+  contiene(await txt('#aviso'), 'Ya tiene una asignación en Sede Centro', 'editar respeta la regla de la sede');
+  igual(await page.locator('#a-sede-a7').inputValue(), 'parque', 'y no cambia la sede');
+
+  // Administración: licencias
+  await page.click('#adm-licencias');
+  igual(await page.locator('.panel table tbody tr').count(), 4, 'cuatro ausencias de ejemplo');
+  contiene(await txt('.panel table thead'), 'Días corridos', 'las ausencias se cuentan en días corridos');
+  await cap('11-licencias', { fullPage: true });
+  await page.selectOption('#li-colab', 'c3');
+  await page.fill('#li-desde', '2026-12-04');
+  await page.locator('#li-desde').blur();
+  await page.click('#btn-licencia');
+  igual(await txt('form[data-form="licencia"] .error'), 'Ya tiene una ausencia cargada en esas fechas.', 'no superpone ausencias');
+  await page.selectOption('#li-colab', 'c6');
+  await page.click('#btn-licencia');
+  igual(await page.locator('.panel table tbody tr').count(), 5, 'ausencia cargada');
+  await page.locator('button[data-a="quitar-licencia"]').last().click();
+  igual(await page.locator('.panel table tbody tr').count(), 4, 'ausencia quitada');
+
+  // Administración: topes con aviso al supervisor
+  await page.click('#adm-reglas');
+  igual(await page.locator('#p-topeFijo').inputValue(), '8', 'tope de 8 h en fijos');
+  igual(await page.locator('#p-topeHora').inputValue(), '10', 'tope de 10 h en por hora');
+  await cap('12-reglas', { fullPage: true });
+  await page.fill('#p-topeHora', '12');
+  await page.locator('#p-topeHora').blur();
+  igual(await page.locator('#p-topeHora').inputValue(), '12', 'el tope se puede cambiar');
+  contiene(await txt('#aviso'), 'Tope actualizado. Supervisión ya tiene el aviso', 'y el cambio avisa');
+  await page.fill('#p-topeFijo', '40');
+  await page.locator('#p-topeFijo').blur();
+  contiene(await txt('#aviso'), 'Usá un número entre 1 y 24', 'valida el tope');
+  await page.fill('#p-rojo', '2');
+  await page.locator('#p-rojo').blur();
+  contiene(await txt('#aviso'), 'no puede ser menor que la gracia', 'valida las reglas');
+  await page.goto(archivo + '#supervisor');
+  await page.waitForSelector('.titulo-pagina h1');
+  const avisos = page.locator('.seccion', { hasText: 'Avisos de administración' });
+  igual(await avisos.locator('.renglon').count(), 2, 'el supervisor recibe los dos avisos');
+  contiene(await avisos.textContent(), 'Administración cambió el tope diario de quienes trabajan por hora de 10 a 12 h.', 'el del cambio de tope');
+  contiene(await avisos.textContent(), 'Asignación por encima del tope. Diego Rojas suma 11 h', 'y el de la asignación que lo superó');
+  await avisos.screenshot({ path: path.join(salida, '13-avisos-supervisor.png') });
+  await avisos.locator('button[data-a="quitar-aviso"]').first().click();
+  igual(await avisos.locator('.renglon').count(), 1, 'marcar como visto saca el aviso');
+
+  // Administración: feriados y preliquidación, con los datos de ejemplo
+  await page.goto(archivo + '#administracion');
+  await page.waitForSelector('.subtabs');
+  await page.click('#reloj-reiniciar');
+  await page.click('#adm-feriados');
+  igual(await page.locator('.panel table tbody tr').count(), 21, 'agenda nacional: lo que queda de 2026 y los 16 feriados y el día no laborable de 2027');
+  contiene(await plano(fila('Lunes 21 de junio de 2027')), 'Trasladado del 17 de junio', 'los trasladables figuran en el lunes que corresponde');
+  contiene(await plano(fila('Sábado 20 de noviembre de 2027')), 'puede cambiar de fecha', 'y el que sigue pendiente lo avisa');
+  igual(await page.locator('#p-recFeriado').inputValue(), '100', 'sugiere pagar doble la hora en feriado');
+  igual(await page.locator('#p-recNoLab').inputValue(), '0', 'y simple la del día no laborable');
+  contiene(await txt('.reglas'), 'Usando lo sugerido', 'indica que rige lo sugerido');
+  contiene(await plano(fila('Lunes 23 de noviembre de 2026')), 'Ya pasó', 'el feriado pasado no estima impacto');
+  contiene(await plano(fila('Martes 8 de diciembre de 2026')), '3 turnos, 18 h', 'tres turnos por hora caen el 8 de diciembre');
+  contiene(await plano(fila('Martes 8 de diciembre de 2026')), '$ 117.000', 'recargo estimado del 8 de diciembre');
+  contiene(await plano(fila('Lunes 7 de diciembre de 2026')), '$ 0', 'el día no laborable no suma recargo');
+  contiene(await plano(fila('Viernes 25 de diciembre de 2026')), '4 turnos, 21 h', 'en Navidad se suma el turno por hora de Marta');
+  await cap('14-feriados', { fullPage: true });
+  await page.fill('#p-recFeriado', '50');
+  await page.locator('#p-recFeriado').blur();
+  contiene(await plano(fila('Martes 8 de diciembre de 2026')), '$ 58.500', 'cambiar el recargo recalcula el impacto');
+  await page.click('#btn-sugerido');
+  contiene(await plano(fila('Martes 8 de diciembre de 2026')), '$ 117.000', 'vuelve a lo sugerido');
+  await page.selectOption('#fe-tipo-2026-12-07', 'feriado');
+  contiene(await plano(fila('Lunes 7 de diciembre de 2026')), '$ 117.000', 'tratar el día no laborable como feriado suma el recargo');
+  await page.selectOption('#fe-tipo-2026-12-07', 'no_laborable');
+  await page.click('#btn-feriado');
+  igual(await txt('form[data-form="feriado"] .error'), 'Elegí la fecha.', 'valida la fecha nueva');
+  await page.fill('#fe-f', '2026-12-24');
+  await page.fill('#fe-nombre', 'Asueto de Nochebuena');
+  await page.selectOption('#fe-tipo', 'no_laborable');
+  await page.click('#btn-feriado');
+  igual(await page.locator('.panel table tbody tr').count(), 22, 'se puede agregar una fecha propia');
+  contiene(await plano(fila('Asueto de Nochebuena')), 'Agregado', 'queda marcada como agregada');
+  await fila('Asueto de Nochebuena').locator('button').click();
+  igual(await page.locator('.panel table tbody tr').count(), 21, 'y quitarla');
+  await page.click('#adm-preliquidacion');
+  contiene(await txt('.tabla-liq thead'), 'En feriado', 'la preliquidación separa las horas en feriado');
+  contiene(await txt('.subtotal >> nth=0'), 'Total de Marta Giménez, 2 asignaciones', 'subtotal por persona con dos asignaciones');
+  const liq = n => page.locator('.tabla-liq tbody tr', { hasText: n });
+  contiene(await plano(liq('Hugo Luna')), 'feriado según convenio', 'lo fijo queda según convenio');
+  contiene(await plano(liq('Lucía Paredes')), 'por feriado', 'lo por hora suma el recargo');
+  await cap('15-preliquidacion', { fullPage: true });
+
+  // Días siguientes: fin de semana, llegada tarde, horas de más y olvido
+  await page.goto(archivo + '#colaborador');
+  await page.waitForSelector('.telefono');
+  await page.click('#reloj-reiniciar');
+  await page.click('#reloj-dia');
+  igual(await txt('#reloj-fecha'), 'Sábado 28 de noviembre', 'el día siguiente es sábado');
+  contiene(await txt('.pantalla'), 'Hoy no tenés turnos asignados', 'Marta no trabaja el sábado');
+  contiene(await txt('.pantalla'), 'no marcaste la salida en Sede Centro', 'pregunta por la salida olvidada del viernes');
+  contiene(await txt('.pantalla'), 'Tenés vacaciones del 14 al 23 de diciembre', 'avisa las vacaciones cargadas');
+  await page.fill('#olvido-hora', '14:10');
+  await page.click('#btn-olvido');
+  contiene(await txt('#aviso'), 'Tu supervisor lo va a revisar', 'declara la salida olvidada');
+  await page.selectOption('#sel-colab', 'c8');
+  contiene(await txt('.pantalla'), 'QR de Sede Centro', 'Paula trabaja el sábado');
+  await page.selectOption('#sel-colab', 'c1');
+  await page.click('#reloj-dia');
+  await page.click('#reloj-dia');
+  igual(await txt('#reloj-fecha'), 'Lunes 30 de noviembre', 'lunes');
+  igual(await page.locator('.turnos-hoy').count(), 0, 'el lunes Marta tiene un solo turno');
+  await page.click('#pr-tarde');
+  await page.click('#btn-entrada');
+  contiene(await txt('.pantalla'), 'Entrada con 12 min de demora', 'llegada tarde');
+  await page.click('#pr-extra');
+  await page.click('#btn-abrir-cierre');
+  contiene(await txt('form[data-form="cierre"]'), 'Registramos 1 h 20 min de más', 'detecta tiempo de más');
+  await page.click('#btn-cerrar');
+  igual(await txt('form[data-form="cierre"] .error'), 'Elegí qué pasó con el tiempo de más.', 'pide explicar el tiempo de más');
+  await page.check('#que-extra');
+  await page.fill('#cierre-texto', 'Me quedé a recibir el pedido de insumos.');
+  await page.click('#btn-cerrar');
+  igual(await txt('.cierre-ok h2'), 'Gracias, Marta', 'cierre con revisión');
+  await page.click('#reloj-dia');
+  await page.click('#reloj-dia');
+  igual(await txt('#reloj-fecha'), 'Miércoles 2 de diciembre', 'miércoles con dos turnos');
+  igual(await page.locator('.turnos-hoy li').count(), 2, 'dos turnos el miércoles');
+  await hora('06:00');
+  contiene(await txt('#aviso'), 'solo avanza', 'el reloj no retrocede');
+  await page.selectOption('#sel-colab', 'c3');
+  contiene(await txt('.pantalla'), 'Hoy figura como vacaciones', 'Lucía está de vacaciones y no ficha');
+  await page.selectOption('#sel-colab', 'c4');
+  igual(await txt('.cabecera-app h1'), 'Hola, Ramón', 'cambia de colaborador');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  igual(await txt('.cabecera-app h1'), 'Hola, Ramón', 'conserva el estado al recargar');
+
+  // Feriado trabajado: martes 8 de diciembre
+  await page.selectOption('#sel-colab', 'c2');
+  for (let i = 0; i < 6; i++) await page.click('#reloj-dia');
+  igual(await txt('#reloj-fecha'), 'Martes 8 de diciembre', 'llega al feriado');
+  contiene(await txt('.pantalla'), 'Hoy es feriado: Inmaculada Concepción de María', 'la app avisa que es feriado y que se registra igual');
+  await page.click('#btn-entrada');
+  await hora('13:02');
+  await page.click('#btn-abrir-cierre');
+  await page.check('#cierre-ok');
+  await page.click('#btn-cerrar');
+  await page.waitForTimeout(1100);
+  await cap('16-feriado-trabajado', telefono);
+  await page.goto(archivo + '#supervisor');
+  await page.waitForSelector('.titulo-pagina h1');
+  contiene(await txt('.titulo-pagina p'), 'Feriado: Inmaculada Concepción de María', 'supervisión ve que hoy es feriado');
+  await page.goto(archivo + '#administracion');
+  await page.waitForSelector('.subtabs');
+  await page.click('#adm-preliquidacion');
+  contiene(await txt('.seccion > h2'), 'Preliquidación de diciembre', 'preliquidación del mes en curso');
+  contiene(await plano(liq('Diego Rojas').locator('td >> nth=4')), '6 hno laborable: ', 'las horas del feriado se cuentan aparte de las del día no laborable');
+  contiene(await plano(liq('Diego Rojas')), 'incluye $ 39.000 por feriado', 'y el recargo se calcula sobre las 6 h del turno en feriado');
+  await page.locator('.tabla-liq').screenshot({ path: path.join(salida, '17-preliquidacion-diciembre.png') });
+
+  // Turno de noche: entra el domingo y cierra el lunes
+  await page.goto(archivo + '#colaborador');
+  await page.waitForSelector('.telefono');
+  await page.click('#reloj-reiniciar');
+  await page.selectOption('#sel-colab', 'c7');
+  igual(await txt('.cabecera-app h1'), 'Hola, Hugo', 'teléfono de Hugo');
+  contiene(await txt('.pruebas'), 'Hugo trabaja de 22:00 a 06:00, los lunes, martes, miércoles, jueves y domingos', 'la guía dice quién tiene turno de noche y cuándo');
+  await page.click('#reloj-dia');
+  await page.click('#reloj-dia');
+  igual(await txt('#reloj-fecha'), 'Domingo 29 de noviembre', 'domingo');
+  igual(await page.locator('#reloj-hora').inputValue(), '21:50', 'el reloj arranca cerca del turno de noche');
+  contiene(await txt('.pantalla'), 'Tu turno es de 22:00 a 06:00', 'turno nocturno');
+  await page.click('#btn-entrada');
+  contiene(await txt('.pantalla'), 'Llegaste a horario', 'entrada de noche');
+  await page.click('#reloj-dia');
+  igual(await txt('#reloj-fecha'), 'Lunes 30 de noviembre', 'pasa la medianoche');
+  igual(await page.locator('#reloj-hora').inputValue(), '05:50', 'el reloj queda cerca del fin del turno');
+  igual(await page.locator('.turnos-hoy li').count(), 2, 've el turno que viene de anoche y el de esta noche');
+  contiene(await txt('.turnos-hoy li >> nth=0'), '22:00 a 06:00, desde ayer. En curso', 'y distingue cuál viene de ayer');
+  igual(await page.locator('.pruebas h3', { hasText: 'Dos sedes en un día' }).count(), 0, 'la guía no habla de dos sedes cuando es la misma');
+  contiene(await txt('.pantalla'), 'Llevás 8 h de jornada', 'el turno sigue abierto del otro lado de la medianoche');
+  await cap('18-turno-de-noche', telefono);
+  await hora('06:03');
+  await page.click('#btn-abrir-cierre');
+  contiene(await txt('form[data-form="cierre"]'), 'Confirmo que trabajé de 21:50 a 06:03', 'confirma las horas del turno nocturno');
+  await page.check('#cierre-ok');
+  await page.click('#btn-cerrar');
+  igual(await txt('.cierre-ok h2'), 'Muy bien, Hugo', 'cierre del turno de noche');
+  contiene(await txt('.resultado'), 'Jornada completa, de 21:50 a 06:03', 'queda en verde');
+  contiene(await txt('.mensaje'), 'Tu próximo turno de hoy empieza a las 22:00', 'y anuncia el de esta noche');
+  await page.click('#tab-jornadas');
+  contiene(await txt('.lista-jornadas .fila >> nth=1'), '21:50 a 06:03', 'el turno queda en el día en que empezó');
+  await page.goto(archivo + '#supervisor');
+  await page.waitForSelector('.titulo-pagina h1');
+  contiene(await page.locator('.seccion table tbody tr', { hasText: 'desde ayer' }).first().textContent(), 'Hugo Luna', 'supervisión ve el turno que venía de ayer');
+  await page.goto(archivo + '#colaborador');
+  await page.waitForSelector('.telefono');
+  await page.click('#reloj-reiniciar');
+  igual(await txt('.cabecera-app h1'), 'Hola, Marta', 'reinicia la demo');
+
+  // Pantalla mediana: nada se sale de la página
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.goto(archivo + '#administracion');
+  await page.waitForSelector('.subtabs');
+  for (const t of ['cronograma', 'personal', 'licencias', 'feriados', 'reglas', 'preliquidacion']) {
+    await page.click('#adm-' + t);
+    igual(await sinDesborde(), true, t + ' sin desborde horizontal en pantalla mediana');
+  }
+  await page.click('#adm-cronograma');
+  await cap('18b-mediana-cronograma');
+  await page.goto(archivo + '#colaborador');
+  await page.waitForSelector('.telefono');
+
+  // Celular y tema oscuro
+  await page.setViewportSize({ width: 390, height: 844 });
+  await cap('19-celular', { fullPage: true });
+  igual(await sinDesborde(), true, 'colaborador sin desborde horizontal en celular');
+  await page.goto(archivo + '#administracion');
+  await page.waitForSelector('.subtabs');
+  await page.click('#adm-cronograma');
+  await page.waitForSelector('.grilla');
+  igual(await sinDesborde(), true, 'cronograma sin desborde horizontal en celular');
+  await cap('20-celular-cronograma', { fullPage: true });
+  await page.click('#adm-personal');
+  igual(await sinDesborde(), true, 'asignaciones sin desborde horizontal en celular');
+  await page.click('#adm-feriados');
+  igual(await sinDesborde(), true, 'feriados sin desborde horizontal en celular');
+  await cap('21-celular-feriados', { fullPage: true });
+  await page.goto(archivo + '#supervisor');
+  await page.waitForSelector('.titulo-pagina h1');
+  igual(await sinDesborde(), true, 'supervisión sin desborde horizontal en celular');
+  await page.setViewportSize({ width: 1320, height: 900 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto(archivo + '#administracion');
+  await page.waitForSelector('.subtabs');
+  await page.click('#adm-cronograma');
+  await page.waitForSelector('.grilla');
+  await page.click('#sem-sig');
+  await cap('22-oscuro-cronograma');
+  await page.click('#adm-feriados');
+  await cap('23-oscuro-feriados');
+
+  await browser.close();
+  if (errores.length) { mal += errores.length; console.log('Errores en la página:\n' + errores.join('\n')); }
+  console.log(ok + ' correctas, ' + mal + ' fallas');
+  process.exit(mal ? 1 : 0);
+})().catch(e => { console.error('ERROR', e); process.exit(1); });

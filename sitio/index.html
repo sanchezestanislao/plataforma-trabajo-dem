@@ -1,0 +1,2544 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plataforma de trabajo</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1A2233">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="iconos/icono-192.png">
+<link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Plataforma">
+<style>@font-face{font-family:"Overpass";font-style:normal;font-weight:100 900;font-display:swap;src:url(tipografia/overpass-latin-wght-normal.woff2) format("woff2")}</style>
+<style>
+:root{
+  /* Idea de layout: barra y reloj de la demo arriba; el colaborador vive en un marco de teléfono y
+     supervisión y administración en una columna ancha. El semáforo es siempre una carcasa oscura con luces. */
+  --fondo:#EEF1F6; --superficie:#FFFFFF; --tinta:#172033; --tinta-2:#55607A; --linea:#D5DBE7;
+  --accion:#2447D9; --accion-tinta:#FFFFFF; --accion-suave:#E5EAFB;
+  --carcasa:#1A2233; --apagada:#35425F; --borde-carcasa:#1A2233; --sobre-carcasa:#EEF1F8; --sobre-carcasa-2:#A8B3CC;
+  --verde:#27B56C; --ambar:#F2A51F; --rojo:#E5484D; --estrella:#FFFFFF; --rojo-texto:#B4232A;
+  --verde-suave:#E0F4E8; --ambar-suave:#FCF0D6; --rojo-suave:#FBE4E4;
+  --papel:#FFFFFF; --papel-tinta:#172033;
+  --display:"Overpass","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  --cuerpo:"Overpass","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  --r:10px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --fondo:#0E131D; --superficie:#171E2D; --tinta:#E9EDF6; --tinta-2:#9BA7C0; --linea:#2B354B;
+    --accion:#8FA5FF; --accion-tinta:#0E131D; --accion-suave:#1D274A;
+    --carcasa:#080B12; --apagada:#283247; --borde-carcasa:#2B354B; --sobre-carcasa:#EEF1F8; --sobre-carcasa-2:#8E9AB5;
+    --verde:#35C97D; --ambar:#F5B13A; --rojo:#F0595E; --estrella:#FFFFFF; --rojo-texto:#FF9A9D;
+    --verde-suave:#12301F; --ambar-suave:#382B10; --rojo-suave:#3A1719;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --fondo:#0E131D; --superficie:#171E2D; --tinta:#E9EDF6; --tinta-2:#9BA7C0; --linea:#2B354B;
+  --accion:#8FA5FF; --accion-tinta:#0E131D; --accion-suave:#1D274A;
+  --carcasa:#080B12; --apagada:#283247; --borde-carcasa:#2B354B; --sobre-carcasa:#EEF1F8; --sobre-carcasa-2:#8E9AB5;
+  --verde:#35C97D; --ambar:#F5B13A; --rojo:#F0595E; --estrella:#FFFFFF; --rojo-texto:#FF9A9D;
+  --verde-suave:#12301F; --ambar-suave:#382B10; --rojo-suave:#3A1719;
+  color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--fondo);color:var(--tinta);font-family:var(--cuerpo);font-size:16px;line-height:1.45;font-variant-numeric:tabular-nums}
+h1,h2,h3,p,ul,ol,dl,dd,fieldset{margin:0;padding:0}
+ul,ol{list-style:none}
+fieldset{border:0;min-width:0}
+legend{padding:0}
+h1,h2,h3{font-family:var(--display);font-weight:800;line-height:1.15;text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accion);outline-offset:2px}
+[hidden]{display:none!important}
+.oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+/* Barra y reloj de la demo */
+.barra{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 24px;padding:14px 20px;background:var(--superficie);border-bottom:1px solid var(--linea)}
+.marca{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.marca strong{font-family:var(--display);font-weight:800;font-size:20px;letter-spacing:-.01em}
+.marca span{font-size:14px;color:var(--tinta-2)}
+.roles{display:flex;flex-wrap:wrap;gap:4px;padding:4px;background:var(--fondo);border-radius:999px}
+.roles a{padding:8px 16px;border-radius:999px;color:var(--tinta-2);font-weight:600;text-decoration:none}
+.roles a:hover{color:var(--tinta)}
+.roles a[aria-current="page"]{background:var(--tinta);color:var(--superficie)}
+.reloj{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:12px 20px;background:var(--carcasa);color:var(--sobre-carcasa);border-bottom:1px solid var(--borde-carcasa)}
+.reloj-cuando{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px}
+.reloj-titulo{font-size:14px;color:var(--sobre-carcasa-2)}
+.reloj-fecha{font-family:var(--display);font-weight:800;font-size:18px}
+.reloj input[type="time"]{min-height:38px;background:transparent;border:1px solid var(--apagada);border-radius:8px;padding:5px 10px;color:var(--sobre-carcasa);font-weight:800;font-size:18px;color-scheme:dark}
+.btn-r{min-height:38px;background:transparent;border:1px solid var(--apagada);border-radius:8px;padding:7px 12px;color:var(--sobre-carcasa);font-weight:600;font-size:14px}
+.btn-r:hover{border-color:var(--sobre-carcasa-2)}
+.reloj :focus-visible{outline-color:var(--sobre-carcasa)}
+.empuja{margin-left:auto}
+/* Aviso para instalar en el teléfono: solo existe en el sitio publicado */
+.instalar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 20px;background:var(--accion-suave);border-bottom:1px solid var(--linea)}
+.instalar p{flex:1 1 260px;font-size:15px}
+
+main{max-width:1320px;margin:0 auto;padding:28px 20px 80px}
+
+/* Botones y formularios */
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:12px 18px;border-radius:12px;border:1.5px solid var(--linea);background:var(--superficie);color:var(--tinta);font-weight:600;font-size:16px;text-align:center}
+.btn:hover{border-color:var(--tinta-2)}
+.btn.primario{background:var(--accion);border-color:var(--accion);color:var(--accion-tinta)}
+.btn.primario:hover{filter:brightness(1.1)}
+.btn.chico{min-height:38px;padding:7px 12px;font-size:14px;border-radius:9px}
+.btn.ancho{width:100%}
+.enlace{align-self:flex-start;background:none;border:0;padding:4px 0;color:var(--accion);font-weight:600;text-decoration:underline;text-underline-offset:3px;text-align:left}
+input[type="text"],input[type="time"],input[type="date"],input[type="number"],select,textarea{min-height:42px;max-width:100%;background:var(--superficie);border:1.5px solid var(--linea);border-radius:9px;padding:8px 11px;font-weight:400}
+input[type="file"]{max-width:100%;font-size:14px;font-weight:400}
+textarea{width:100%;min-height:64px;resize:vertical}
+input:disabled{opacity:.6}
+.campo{display:flex;flex-direction:column;gap:6px;font-weight:600;font-size:15px}
+.campo legend{font-weight:600;font-size:15px;margin-bottom:8px}
+.campo-linea select{align-self:flex-start}
+.opcion{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border:1.5px solid var(--linea);border-radius:var(--r);font-weight:400;font-size:16px;cursor:pointer}
+.opcion + .opcion{margin-top:8px}
+.opcion input{width:22px;height:22px;margin:1px 0 0;accent-color:var(--accion);flex:none}
+.opcion:has(input:checked){border-color:var(--accion);background:var(--accion-suave)}
+.segmento{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.segmento label{position:relative;display:block;cursor:pointer}
+.segmento input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.segmento span{display:block;text-align:center;padding:10px 6px;border:1.5px solid var(--linea);border-radius:9px;font-weight:600}
+.segmento input:checked + span{background:var(--tinta);border-color:var(--tinta);color:var(--superficie)}
+.segmento input:focus-visible + span{outline:3px solid var(--accion);outline-offset:2px}
+.nota{padding:12px 14px;border-radius:var(--r);font-size:15px}
+.nota.ok{background:var(--verde-suave)}
+.nota.obs{background:var(--ambar-suave)}
+.nota.falta{background:var(--rojo-suave)}
+.nota.info{background:var(--accion-suave)}
+.form-nota{display:flex;flex-direction:column;gap:10px}
+.fila-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ayuda{font-size:14px;color:var(--tinta-2)}
+.error{font-size:14px;font-weight:600;color:var(--rojo-texto)}
+.error:empty{display:none}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;background:var(--fondo);border:1px solid var(--linea);font-size:13px;font-weight:600;white-space:nowrap}
+.pill.crit-alta{background:var(--rojo-suave);border-color:transparent}
+.pill.crit-media{background:var(--ambar-suave);border-color:transparent}
+.pill.est-resuelta{background:var(--verde-suave);border-color:transparent}
+.pill.est-en_curso{background:var(--accion-suave);border-color:transparent}
+.pill.fer{background:var(--tinta);border-color:var(--tinta);color:var(--superficie)}
+.dia .pill,.nombre .pill{margin-left:8px;vertical-align:1px}
+.caso-quien .pill + .pill{margin-left:6px}
+
+/* Luces del semáforo: siempre sobre carcasa oscura */
+.luz{--d:16px;position:relative;display:inline-block;width:var(--d);height:var(--d);border-radius:50%;background:var(--apagada);flex:none;vertical-align:middle}
+.luz-verde{background:var(--verde)}
+.luz-amarillo{background:var(--ambar)}
+.luz-rojo{background:var(--rojo)}
+.luz-revision{background:transparent;border:2px dashed var(--sobre-carcasa-2)}
+.luz-en_curso{background:transparent;border:2px solid var(--sobre-carcasa)}
+.luz-justificada::after{content:"";position:absolute;left:22%;right:22%;top:calc(50% - 1px);height:2px;border-radius:2px;background:var(--sobre-carcasa-2)}
+.luz-estrella{background:none;border-radius:0;transform:scale(1.4)}
+.luz-estrella svg{display:block;width:100%;height:100%;fill:var(--estrella)}
+.chip-luz{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:30px;height:30px;padding:0 8px;background:var(--carcasa);border:1px solid var(--borde-carcasa);border-radius:999px;color:var(--sobre-carcasa);font-weight:800;font-size:14px;flex:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px;min-width:236px}
+
+/* Colaborador */
+.demo-colab{display:grid;grid-template-columns:minmax(0,390px) minmax(0,1fr);gap:56px;align-items:start}
+.telefono{display:grid;grid-template-rows:auto minmax(0,1fr) auto;height:740px;background:var(--superficie);border:10px solid var(--carcasa);border-radius:42px;overflow:hidden;box-shadow:0 30px 60px -32px rgba(15,22,40,.6)}
+.cabecera-app{padding:22px 22px 12px}
+.fecha-app{font-size:14px;color:var(--tinta-2)}
+.cabecera-app h1{font-size:30px;letter-spacing:-.01em;margin-top:2px}
+.pantalla{overflow-y:auto;padding:6px 22px 24px;display:flex;flex-direction:column;gap:16px}
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--linea);background:var(--superficie)}
+.tabs button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 2px 12px;background:none;border:0;color:var(--tinta-2);font-size:12px}
+.tabs button[aria-current="true"]{color:var(--accion);font-weight:600}
+.tabs svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.bloque{display:flex;flex-direction:column;gap:14px}
+.sede{font-family:var(--display);font-weight:800;font-size:22px;line-height:1.2}
+.turno-txt{color:var(--tinta-2)}
+.titulo-tab{font-size:22px}
+.subtitulo{font-size:17px;margin-top:6px}
+.tiempos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.tiempo{display:flex;flex-direction:column;background:var(--fondo);border-radius:var(--r);padding:12px 14px}
+.tiempo span{font-size:14px;color:var(--tinta-2)}
+.tiempo strong{font-family:var(--display);font-weight:800;font-size:34px;line-height:1.1;letter-spacing:-.01em}
+.qr-caja{display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px;background:var(--fondo);border-radius:var(--r);font-size:14px;color:var(--tinta-2)}
+.qr{width:128px;height:128px;background:var(--papel);border-radius:8px}
+.qr rect{fill:var(--papel-tinta)}
+.qr .hueco{fill:var(--papel)}
+
+.cierre-ok{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;padding-top:4px}
+.semaforo-v{display:grid;gap:9px;padding:11px;background:var(--carcasa);border:1px solid var(--borde-carcasa);border-radius:30px}
+.foco{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--apagada)}
+.foco.verde{background:var(--verde)}
+.foco.ambar{background:var(--ambar)}
+.foco.rojo{background:var(--rojo)}
+.foco.en-revision{background:transparent;border:3px dashed var(--sobre-carcasa-2)}
+.foco.con-estrella{background:transparent}
+.foco.con-estrella svg{width:48px;height:48px;fill:var(--estrella)}
+.cierre-ok h2{font-size:30px;letter-spacing:-.01em}
+.mensaje{font-size:18px;max-width:27ch}
+.resultado{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px;text-align:left}
+.racha{color:var(--tinta-2);font-size:15px}
+.acciones{display:flex;flex-direction:column;gap:10px;width:100%;margin-top:6px}
+.festejo .foco.on{animation:encender .8s cubic-bezier(.2,.8,.2,1) both}
+.festejo h2,.festejo .mensaje{animation:subir .5s .3s ease-out both}
+@keyframes encender{0%{transform:scale(.55);filter:brightness(.35)}60%{transform:scale(1.12);filter:none}100%{transform:scale(1)}}
+@keyframes subir{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+.cuentas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.cuentas li{display:flex;align-items:center;gap:8px;font-size:15px}
+.fila{display:grid;grid-template-columns:46px minmax(0,1fr)}
+.riel{display:grid;place-items:center;background:var(--carcasa);border-left:1px solid var(--borde-carcasa);border-right:1px solid var(--borde-carcasa)}
+.fila:first-child .riel{border-top:1px solid var(--borde-carcasa);border-radius:23px 23px 0 0}
+.fila:last-child .riel{border-bottom:1px solid var(--borde-carcasa);border-radius:0 0 23px 23px}
+.fila:only-child .riel{border-radius:23px}
+.riel .luz{--d:20px}
+.cont{min-width:0;padding:12px 0 12px 14px;border-bottom:1px solid var(--linea)}
+.fila:last-child .cont{border-bottom:0}
+.linea1{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.dia{font-weight:800}
+.horas{color:var(--tinta-2);font-size:15px;white-space:nowrap}
+.det{font-size:15px}
+.descargo{font-size:14px;color:var(--tinta-2);margin-top:2px}
+.form-descargo{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:6px}
+.lista-nov li{display:flex;flex-direction:column;gap:4px;padding:12px 0;border-bottom:1px solid var(--linea)}
+.lista-nov li:last-child{border-bottom:0}
+.logros{display:flex;flex-direction:column}
+.logros li{display:flex;align-items:baseline;gap:12px;padding:10px 0;border-bottom:1px solid var(--linea);font-size:15px}
+.logros b{font-family:var(--display);font-weight:800;font-size:22px;min-width:74px}
+
+.guia{display:flex;flex-direction:column;gap:20px;max-width:560px;padding-top:10px}
+.guia h2{font-size:36px;letter-spacing:-.02em}
+.pruebas li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 16px;align-items:center;padding:16px 0;border-top:1px solid var(--linea)}
+.pruebas li:last-child{border-bottom:1px solid var(--linea)}
+.pruebas h3{grid-column:1;font-size:18px}
+.pruebas p{grid-column:1;color:var(--tinta-2)}
+.pruebas .btn{grid-column:2;grid-row:1 / span 2}
+
+/* Supervisión y administración */
+.pagina{display:flex;flex-direction:column;gap:38px}
+.titulo-pagina h1{font-size:40px;letter-spacing:-.02em}
+.titulo-pagina p{color:var(--tinta-2)}
+.indicadores{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--linea);border-bottom:1px solid var(--linea)}
+.indicadores li{display:flex;align-items:baseline;gap:10px;padding:14px 16px 14px 0}
+.indicadores li + li{border-left:1px solid var(--linea);padding-left:16px}
+.indicadores b{font-family:var(--display);font-weight:800;font-size:30px}
+.indicadores span{color:var(--tinta-2);font-size:15px}
+.seccion{display:flex;flex-direction:column;gap:14px}
+.seccion > h2{font-size:24px;letter-spacing:-.01em}
+.bajada{color:var(--tinta-2);margin-top:-8px;max-width:72ch}
+.panel{background:var(--superficie);border:1px solid var(--linea);border-radius:14px}
+.vacio{padding:18px 20px;color:var(--tinta-2)}
+.nombre{font-weight:800}
+td .nombre{white-space:nowrap}
+.sub{color:var(--tinta-2);font-size:15px}
+.caso{display:grid;grid-template-columns:minmax(0,210px) minmax(0,1fr) minmax(0,270px);gap:22px;padding:18px 20px;border-bottom:1px solid var(--linea)}
+.caso:last-child{border-bottom:0}
+.caso-quien{display:flex;flex-direction:column;gap:6px}
+.caso-datos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 18px;align-content:start}
+.caso-datos dt{font-size:13px;color:var(--tinta-2)}
+.caso-datos dd{font-weight:600}
+.caso-datos .ancho{grid-column:1 / -1}
+.caso-datos .ancho dd{font-weight:400}
+.caso-form{display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.caso-form legend{font-size:13px;color:var(--tinta-2);margin-bottom:4px}
+.radio{display:flex;align-items:center;gap:8px;padding:4px 0;cursor:pointer}
+.radio input{width:18px;height:18px;margin:0;accent-color:var(--accion)}
+.linea{display:flex;align-items:center;gap:10px;font-size:15px}
+.renglon{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--linea)}
+.renglon.dos{grid-template-columns:minmax(0,1fr) auto}
+.renglon > .pill{min-width:62px;text-align:center}
+.renglon:last-child{border-bottom:0}
+.renglon-accion{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.renglon-accion select{min-height:38px;padding:5px 9px;font-size:15px}
+.tabla-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15px}
+th{padding:12px 14px;border-bottom:1px solid var(--linea);font-size:13px;font-weight:600;color:var(--tinta-2);text-align:left;white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid var(--linea);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
+tfoot td{border-top:1px solid var(--linea);border-bottom:0;font-weight:600}
+td.num,th.num{text-align:right;white-space:nowrap}
+.estado-celda{display:flex;align-items:center;gap:9px;min-width:220px}
+.tabla-edit input,.tabla-edit select{min-height:38px;padding:5px 9px;font-size:15px}
+.tabla-edit th,.tabla-edit td{padding-left:6px;padding-right:6px}
+.tabla-edit th:first-child,.tabla-edit td:first-child{padding-left:20px}
+.tabla-edit input[type="text"]{width:132px}
+.tabla-edit input[type="number"]{width:100px}
+.par{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;color:var(--tinta-2);font-size:14px}
+.par input{color:var(--tinta)}
+.tilde{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.tilde input{width:18px;height:18px;min-height:0;margin:0;padding:0;accent-color:var(--accion)}
+.form-alta{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px;align-items:end;padding:18px 20px;border-top:1px solid var(--linea)}
+.form-alta .error,.form-alta .btn{grid-column:1 / -1}
+.form-alta .btn{justify-self:start}
+.form-alta input,.form-alta select{width:100%}
+.reglas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;padding:18px 20px}
+.regla{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.regla label{font-weight:800}
+.regla p{font-size:14px;color:var(--tinta-2)}
+.regla p.nombre{font-size:16px;color:var(--tinta)}
+.regla input{width:96px}
+.pie-tabla{padding:12px 20px 16px;border-top:1px solid var(--linea);font-size:14px;color:var(--tinta-2);max-width:none}
+
+.tablero-wrap{overflow-x:auto;padding:16px 20px 12px}
+.tablero{display:grid;row-gap:8px;align-items:center;width:max-content}
+.t-dia{font-size:12px;line-height:1.2;color:var(--tinta-2);text-align:center}
+.t-dia span{display:block}
+.t-dia.fer{margin:0 2px;padding:2px 0;border-radius:6px;background:var(--tinta);color:var(--superficie)}
+.leyenda .t-dia.muestra{display:inline-grid;place-items:center;width:22px;height:22px;margin:0;padding:0;font-weight:600}
+.t-nombre{padding-right:16px;font-weight:600;white-space:nowrap;line-height:1.2}
+.t-nombre span{display:block;font-weight:400;font-size:12px;color:var(--tinta-2)}
+.t-celda{display:grid;place-items:center;height:32px;background:var(--carcasa)}
+.t-celda.pri{border-radius:16px 0 0 16px}
+.t-celda.ult{border-radius:0 16px 16px 0}
+.t-luz{display:grid;place-items:center;width:28px;height:28px;padding:0;background:none;border:0;border-radius:50%}
+.t-luz:hover{background:var(--apagada)}
+.t-luz[aria-pressed="true"]{box-shadow:0 0 0 2px var(--sobre-carcasa)}
+.t-luz:focus-visible{outline-color:var(--sobre-carcasa)}
+.leyenda{display:flex;flex-wrap:wrap;gap:8px 18px;padding:4px 20px 14px;font-size:14px;color:var(--tinta-2)}
+.leyenda li{display:flex;align-items:center;gap:7px}
+.leyenda .chip-luz{height:24px;min-width:24px;padding:0 5px}
+.detalle{margin:0 20px 18px;padding:14px 16px;background:var(--fondo);border-radius:var(--r);font-size:15px}
+
+#aviso{position:fixed;left:50%;bottom:24px;z-index:10;width:max-content;max-width:min(540px,calc(100% - 32px));padding:12px 18px;background:var(--tinta);color:var(--superficie);border-radius:12px;font-weight:600;font-size:15px;opacity:0;transform:translate(-50%,16px);transition:opacity .2s,transform .2s;pointer-events:none}
+#aviso.visible{opacity:1;transform:translate(-50%,0)}
+
+/* Sub-navegación de administración */
+.subtabs{display:flex;flex-wrap:wrap;gap:2px 6px;margin-top:-16px;border-bottom:1px solid var(--linea)}
+.subtabs button{margin-bottom:-1px;padding:10px 14px;background:none;border:0;border-bottom:3px solid transparent;color:var(--tinta-2);font-weight:600}
+.subtabs button:hover{color:var(--tinta)}
+.subtabs button[aria-current="true"]{color:var(--tinta);border-bottom-color:var(--accion)}
+
+/* Casillas de lunes a domingo */
+.dias{display:inline-flex;gap:3px}
+.dias label{position:relative;display:block;cursor:pointer}
+.dias input{position:absolute;inset:0;width:100%;height:100%;min-height:0;opacity:0;margin:0;cursor:pointer}
+.dias span{display:grid;place-items:center;width:27px;height:34px;border:1.5px solid var(--linea);border-radius:8px;font-size:13px;font-weight:600;color:var(--tinta-2)}
+.dias input:checked + span{background:var(--tinta);border-color:var(--tinta);color:var(--superficie)}
+.dias input:focus-visible + span{outline:3px solid var(--accion);outline-offset:2px}
+
+/* Turnos del día en el teléfono */
+.turnos-hoy{border:1px solid var(--linea);border-radius:var(--r);overflow:hidden}
+.turnos-hoy li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--linea)}
+.turnos-hoy li:last-child{border-bottom:0}
+.turnos-hoy li[aria-current="true"]{background:var(--accion-suave)}
+.turnos-hoy .dia{line-height:1.25}
+.horas-t{font-size:14px;color:var(--tinta-2)}
+.sede-mini{font-size:14px;color:var(--tinta-2)}
+
+/* Grilla por sede: horario contratado, personas asignadas y cobertura */
+.sedes-sel{display:flex;flex-wrap:wrap;gap:8px}
+.sedes-sel button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 16px;background:var(--superficie);border:1.5px solid var(--linea);border-radius:12px;text-align:left}
+.sedes-sel button:hover{border-color:var(--tinta-2)}
+.sedes-sel button[aria-current="true"]{border-color:var(--tinta);box-shadow:inset 0 0 0 1px var(--tinta)}
+.sedes-sel b{font-weight:800}
+.sedes-sel span{font-size:13px;color:var(--tinta-2)}
+.semana-nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:16px 20px 0}
+.semana-nav strong{margin-right:auto;font-family:var(--display);font-weight:800;font-size:20px}
+.grilla-wrap{overflow-x:auto;padding:14px 20px 12px}
+.grilla{display:grid;grid-template-columns:46px repeat(7,minmax(120px,1fr));grid-template-rows:auto auto;gap:8px 6px;min-width:928px}
+.g-eje{grid-column:1;grid-row:2;position:relative}
+.g-eje span{position:absolute;right:4px;transform:translateY(-50%);font-size:12px;color:var(--tinta-2)}
+.g-dia{display:grid;grid-template-rows:subgrid;grid-row:1 / span 2;min-width:0}
+.g-cab{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-height:52px;padding:0 2px}
+.g-fecha{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px}
+.g-dia.hoy .g-cab strong{color:var(--accion)}
+.g-cuerpo{position:relative;overflow:hidden;container-type:inline-size;border-radius:8px;background-color:var(--fondo);background-image:repeating-linear-gradient(to bottom,var(--linea) 0,var(--linea) 1px,transparent 1px,transparent var(--hora,42px))}
+.g-franja{position:absolute;left:0;right:0;background:var(--accion-suave);border-top:2px solid var(--accion);border-bottom:2px solid var(--accion)}
+.g-pers{position:absolute;display:flex;flex-direction:column;overflow:hidden;padding:4px 5px;background:var(--superficie);border:1.5px solid var(--tinta);border-radius:7px;font-size:12px;line-height:1.25;overflow-wrap:anywhere}
+.g-pers b{font-size:13px;font-weight:800}
+.g-pers span{color:var(--tinta-2)}
+.g-pers.bajo .tercero{display:none}
+.g-pers.angosto{padding:4px 4px}
+.g-pers.angosto b{font-size:12px}
+.g-pers.minimo{padding:1px 5px}
+.g-pers.minimo span{display:none}
+.g-pers.vertical{align-items:center;padding:5px 1px}
+.g-pers.vertical b{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap;font-size:12px}
+@container (max-width:139px){
+  .g-pers.angosto{align-items:center;padding:5px 1px}
+  .g-pers.angosto b{writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap}
+  .g-pers.angosto span{display:none}
+}
+.g-pers.aus{border-style:dashed;border-color:var(--tinta-2);background:repeating-linear-gradient(135deg,var(--superficie) 0,var(--superficie) 6px,var(--fondo) 6px,var(--fondo) 12px)}
+.g-pers.aus b{color:var(--tinta-2);text-decoration:line-through}
+.g-seg{position:absolute;left:78%;right:0;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:2px 1px;background:var(--verde-suave);border-left:4px solid var(--verde);font-size:12px;line-height:1.25}
+.g-seg.falta{background:var(--rojo-suave);border-left-color:var(--rojo)}
+.g-seg b{font-weight:800;white-space:nowrap}
+.m-franja,.m-pers,.m-seg{display:inline-block;width:24px;height:14px;border-radius:3px}
+.m-franja{background:var(--accion-suave);border-top:2px solid var(--accion);border-bottom:2px solid var(--accion);border-radius:0}
+.m-pers{background:var(--superficie);border:1.5px solid var(--tinta)}
+.m-pers.aus{border-style:dashed;border-color:var(--tinta-2)}
+.m-seg{background:var(--verde-suave);border-left:4px solid var(--verde);border-radius:0}
+.m-seg.falta{background:var(--rojo-suave);border-left-color:var(--rojo)}
+.fila-flex{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:14px 20px;border-bottom:1px solid var(--linea)}
+.fila-flex input,.fila-flex select{min-height:38px;padding:5px 9px;font-size:15px}
+.corto{width:76px}
+.alertas{display:flex;flex-direction:column;gap:8px;padding:14px 20px;border-top:1px solid var(--linea)}
+.mismo{color:var(--tinta-2)}
+.subtotal td{background:var(--fondo);font-weight:600}
+td > .sub{display:block;font-size:13px}
+.tabla-fer td:nth-child(2){min-width:230px}
+.tabla-liq th{white-space:normal;vertical-align:bottom}
+.tabla-liq th,.tabla-liq td{padding-left:10px;padding-right:10px}
+.tabla-liq th:first-child,.tabla-liq td:first-child{padding-left:20px}
+.tabla-liq th:last-child,.tabla-liq td:last-child{padding-right:20px}
+.tabla-liq .chips{min-width:150px}
+.tabla-liq td .sub{display:block;font-size:13px;font-weight:400;white-space:normal}
+.tabla-liq td:first-child .sub{white-space:nowrap}
+.form-alta fieldset.campo{align-self:stretch}
+.form-alta .campo legend{margin-bottom:6px}
+.form-alta .dias span{height:42px}
+
+
+@media (max-width:900px){
+  .demo-colab{grid-template-columns:minmax(0,1fr);gap:28px}
+  .telefono{width:100%;max-width:420px;margin:0 auto}
+  .guia{max-width:none}
+  .caso{grid-template-columns:minmax(0,1fr)}
+  .indicadores{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .indicadores li + li{border-left:0;padding-left:0}
+  .reglas{grid-template-columns:minmax(0,1fr)}
+  .renglon{grid-template-columns:auto minmax(0,1fr)}
+  .renglon > .renglon-accion{grid-column:1 / -1}
+  .renglon.dos{grid-template-columns:minmax(0,1fr)}
+  .empuja{margin-left:0}
+}
+@media (max-width:520px){
+  main{padding:0 0 64px}
+  .barra{padding:12px 16px}
+  .roles{width:100%;border-radius:14px}
+  .roles a{flex:1;padding:8px 6px;border-radius:10px;font-size:14px;text-align:center}
+  .reloj{padding:10px 16px;gap:8px}
+  .instalar{padding:10px 16px}
+  .reloj-cuando{flex:1 1 100%}
+  .reloj input[type="time"]{min-height:36px;font-size:16px}
+  .btn-r{min-height:36px;padding:6px 10px;font-size:13px}
+  .telefono{max-width:none;height:auto;min-height:560px;border:0;border-radius:0;box-shadow:none;overflow:visible}
+  .pantalla{overflow:visible}
+  .tabs{position:sticky;bottom:0}
+  .guia,.pagina{padding:24px 16px 0}
+  .subtabs{margin-top:-10px}
+  .subtabs button{padding:9px 10px;font-size:15px}
+  .semana-nav strong{flex:1 1 100%}
+  .guia h2{font-size:28px}
+  .titulo-pagina h1{font-size:32px}
+  .pruebas li{grid-template-columns:minmax(0,1fr)}
+  .pruebas .btn{grid-column:1;grid-row:auto;justify-self:start;margin-top:6px}
+}
+@media (prefers-reduced-motion:reduce){
+  .festejo .foco.on,.festejo h2,.festejo .mensaje{animation:none}
+  #aviso{transition:none}
+}
+
+</style>
+</head>
+<body>
+<header class="barra">
+  <div class="marca"><strong>Plataforma de trabajo</strong><span>Prototipo con datos de ejemplo</span></div>
+  <nav class="roles" aria-label="Vistas del prototipo">
+    <a href="#colaborador">Colaborador</a>
+    <a href="#supervisor">Supervisor</a>
+    <a href="#administracion">Administración</a>
+  </nav>
+</header>
+<section class="reloj" aria-label="Reloj de la demo">
+  <span class="reloj-cuando"><span class="reloj-titulo">Reloj de la demo</span><span class="reloj-fecha" id="reloj-fecha"></span></span>
+  <label class="oculto" for="reloj-hora">Hora simulada</label>
+  <input type="time" id="reloj-hora">
+  <button class="btn-r" type="button" data-a="mas" data-min="15" id="reloj-15">Sumar 15 min</button>
+  <button class="btn-r" type="button" data-a="mas" data-min="60" id="reloj-60">Sumar 1 h</button>
+  <button class="btn-r empuja" type="button" data-a="dia" id="reloj-dia">Pasar al día siguiente</button>
+  <button class="btn-r" type="button" data-a="reiniciar" id="reloj-reiniciar">Reiniciar demo</button>
+</section>
+<section class="instalar" id="instalar" hidden aria-label="Instalar la aplicación">
+  <p id="instalar-texto"></p>
+  <button class="btn chico primario" type="button" id="instalar-si">Instalar</button>
+  <button class="btn chico" type="button" id="instalar-no">Ahora no</button>
+</section>
+<main id="vista"></main>
+<div id="aviso" role="status" aria-live="polite"></div>
+<script>
+'use strict';
+
+/* Reglas, datos de ejemplo y acciones. Sin acceso al DOM: este archivo se puede probar en Node.
+   Modelo: un colaborador tiene una o más asignaciones (sede, días, turno, modalidad, valor).
+   Cada asignación genera un tramo por día trabajado; el semáforo se calcula por tramo.
+   Se trabaja todos los días, las 24 horas: los horarios se guardan en minutos desde las 00:00 del día
+   en que empieza el tramo, y un turno nocturno termina pasado el minuto 1440. */
+
+const VERSION = 3;
+const CLAVE = 'prototipo-jornadas-v' + VERSION;
+const INICIO = '2026-11-27';
+const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const DIAS_C = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const DIA_ISO = { 1: 'lunes', 2: 'martes', 3: 'miércoles', 4: 'jueves', 5: 'viernes', 6: 'sábado', 7: 'domingo' };
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const SEMANA = [1, 2, 3, 4, 5, 6, 7];
+/* Agenda nacional: lo que queda de 2026 y el calendario 2027 que surge de la Ley 27.399.
+   Faltan los días no laborables con fines turísticos de 2027: se agregan cuando se publiquen. */
+const CALENDARIO = [
+  { f: '2026-11-23', nombre: 'Día de la Soberanía Nacional', tipo: 'feriado', nota: 'Trasladado del 20 de noviembre' },
+  { f: '2026-12-07', nombre: 'Día no laborable con fines turísticos', tipo: 'no_laborable' },
+  { f: '2026-12-08', nombre: 'Inmaculada Concepción de María', tipo: 'feriado' },
+  { f: '2026-12-25', nombre: 'Navidad', tipo: 'feriado' },
+  { f: '2027-01-01', nombre: 'Año Nuevo', tipo: 'feriado' },
+  { f: '2027-02-08', nombre: 'Carnaval', tipo: 'feriado' },
+  { f: '2027-02-09', nombre: 'Carnaval', tipo: 'feriado' },
+  { f: '2027-03-24', nombre: 'Día Nacional de la Memoria por la Verdad y la Justicia', tipo: 'feriado' },
+  { f: '2027-03-25', nombre: 'Jueves Santo', tipo: 'no_laborable' },
+  { f: '2027-03-26', nombre: 'Viernes Santo', tipo: 'feriado' },
+  { f: '2027-04-02', nombre: 'Día del Veterano y de los Caídos en la Guerra de Malvinas', tipo: 'feriado' },
+  { f: '2027-05-01', nombre: 'Día del Trabajador', tipo: 'feriado' },
+  { f: '2027-05-25', nombre: 'Día de la Revolución de Mayo', tipo: 'feriado' },
+  { f: '2027-06-20', nombre: 'Paso a la Inmortalidad del General Manuel Belgrano', tipo: 'feriado' },
+  { f: '2027-06-21', nombre: 'Paso a la Inmortalidad del General Martín Miguel de Güemes', tipo: 'feriado', nota: 'Trasladado del 17 de junio' },
+  { f: '2027-07-09', nombre: 'Día de la Independencia', tipo: 'feriado' },
+  { f: '2027-08-16', nombre: 'Paso a la Inmortalidad del General José de San Martín', tipo: 'feriado', nota: 'Trasladado del 17 de agosto' },
+  { f: '2027-10-11', nombre: 'Día del Respeto a la Diversidad Cultural', tipo: 'feriado', nota: 'Trasladado del 12 de octubre' },
+  { f: '2027-11-20', nombre: 'Día de la Soberanía Nacional', tipo: 'feriado', nota: 'Cae sábado: puede cambiar de fecha si sale una norma' },
+  { f: '2027-12-08', nombre: 'Inmaculada Concepción de María', tipo: 'feriado' },
+  { f: '2027-12-25', nombre: 'Navidad', tipo: 'feriado' }
+];
+const TIPOS_FERIADO = { feriado: 'Feriado nacional', no_laborable: 'Día no laborable' };
+/* Recargo sugerido para la hora trabajada, en porcentaje sobre el valor hora. */
+const SUGERIDO = { recFeriado: 100, recNoLab: 0 };
+const MOTIVOS = { licencia: 'Licencia', vacaciones: 'Vacaciones', aviso: 'Ausencia con aviso', franco: 'Franco' };
+const TIPOS_LIC = { vacaciones: 'Vacaciones', licencia: 'Licencia', franco: 'Franco' };
+const LIC_FRASE = { vacaciones: 'de vacaciones', licencia: 'con licencia', franco: 'de franco' };
+const TIPOS_NOV = { infra: 'Infraestructura crítica', equipo: 'Elementos o equipos dañados', insumos: 'Falta de insumos', otra: 'Otra solicitud' };
+const CRITICIDAD = { baja: 'Baja', media: 'Media', alta: 'Alta' };
+const ESTADOS_NOV = { abierta: 'Abierta', en_curso: 'En curso', resuelta: 'Resuelta' };
+const MOTIVOS_EXTRA = [
+  'Me quedé a terminar el encerado del hall.',
+  'Hubo un derrame en el depósito y lo limpié antes de irme.',
+  'Cubrí el sector de un compañero hasta que llegó el relevo.',
+  'Me pidieron dejar lista la sala para un evento.'
+];
+
+/* ---------- Fechas y horas ---------- */
+
+function pad(n) { return String(n).padStart(2, '0'); }
+/* Hora del día de un minuto relativo: 1800 (las 06:00 del día siguiente) se muestra 06:00. */
+function hm(m) {
+  if (m == null) return 'Sin marcar';
+  const x = ((Math.round(m) % 1440) + 1440) % 1440;
+  return pad(Math.floor(x / 60)) + ':' + pad(x % 60);
+}
+function aMin(s) {
+  const p = /^(\d{1,2}):(\d{2})/.exec(s || '');
+  if (!p) return null;
+  const h = +p[1], mi = +p[2];
+  return h > 23 || mi > 59 ? null : h * 60 + mi;
+}
+function dur(m) {
+  m = Math.max(0, Math.round(m));
+  const h = Math.floor(m / 60), r = m % 60;
+  if (h && r) return h + ' h ' + r + ' min';
+  if (h) return h + ' h';
+  return r + ' min';
+}
+function cap(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
+function enLista(l) { return l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1]; }
+function fechaObj(iso) { const p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2])); }
+function isoDe(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+function sumarDias(iso, n) { const d = fechaObj(iso); d.setUTCDate(d.getUTCDate() + n); return isoDe(d); }
+function diasEntre(a, b) { return Math.round((fechaObj(b).getTime() - fechaObj(a).getTime()) / 86400000); }
+function diaSemana(iso) { return fechaObj(iso).getUTCDay(); }
+function dIso(iso) { return diaSemana(iso) || 7; }
+function fechaLarga(iso) { const d = fechaObj(iso); return DIAS[d.getUTCDay()] + ' ' + d.getUTCDate() + ' de ' + MESES[d.getUTCMonth()]; }
+function fechaCorta(iso) { const d = fechaObj(iso); return DIAS_C[d.getUTCDay()] + ' ' + d.getUTCDate(); }
+function fechaMedia(iso) { const d = fechaObj(iso); return d.getUTCDate() + ' de ' + MESES[d.getUTCMonth()]; }
+function mesDe(iso) { return iso.slice(0, 7); }
+function nombreMes(iso) { return MESES[fechaObj(iso).getUTCMonth()]; }
+function listaDias(ds) {
+  const o = ds.slice().sort((a, b) => a - b), k = o.join('');
+  if (o.length >= 7) return 'todos los días';
+  if (k === '12345') return 'de lunes a viernes';
+  if (k === '123456') return 'de lunes a sábado';
+  const n = o.map(d => DIA_ISO[d] + (d >= 6 ? 's' : ''));
+  if (n.length === 1) return 'los ' + n[0];
+  return 'los ' + n.slice(0, -1).join(', ') + ' y ' + n[n.length - 1];
+}
+function lunesDe(iso) { return sumarDias(iso, 1 - dIso(iso)); }
+function esFecha(s) { return /^\d{4}-\d{2}-\d{2}$/.test(s || '') && isoDe(fechaObj(s)) === s; }
+function vigente(a, f) { return (!a.desde || f >= a.desde) && (!a.hasta || f <= a.hasta); }
+function seCruzan(x, y) { return (!x.hasta || !y.desde || y.desde <= x.hasta) && (!y.hasta || !x.desde || x.desde <= y.hasta); }
+function diasCorridos(desde, hasta) { return Math.max(0, diasEntre(desde, hasta) + 1); }
+/* Fin de un turno en minutos relativos: si la hora de fin no es posterior al inicio, termina al día siguiente. */
+function finRel(ti, hasta) { return hasta > ti ? hasta : hasta + 1440; }
+/* Hora del día llevada a minutos relativos de un tramo: lo anterior al inicio se entiende como del día siguiente. */
+function aRel(j, m) { return m == null ? null : (m < j.ti % 1440 ? m + 1440 : m); }
+function diasValidos(lista) {
+  const o = [];
+  for (const x of lista || []) { const d = Number(x); if (d >= 1 && d <= 7 && o.indexOf(d) < 0) o.push(d); }
+  return o.sort((a, b) => a - b);
+}
+
+/* ---------- Azar reproducible para los datos de ejemplo ---------- */
+
+function rnd(S) {
+  let t = (S.rng = (S.rng + 0x6D2B79F5) | 0);
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+function ent(S, a, b) { return a + Math.floor(rnd(S) * (b - a + 1)); }
+
+/* ---------- Regla central: el estado de un tramo ----------
+   P.gracia  minutos de tolerancia en la llegada (verde)
+   P.rojo    demora a partir de la cual el tramo queda en rojo
+   P.margen  minutos de más a partir de los cuales se abre el control excedente
+   rel       la hora actual en minutos relativos al día del tramo */
+
+function evaluar(j, P, rel) {
+  const r = { estado: '', detalle: '', demora: 0, desde: j.ti, excedente: null, pendiente: false, extra: 0, normales: 0, enRevision: 0, inasistencia: false, enVivo: false };
+  if (j.justif) {
+    r.estado = 'justificada';
+    r.detalle = MOTIVOS[j.justif] || 'Justificada';
+    return r;
+  }
+  if (j.entrada == null) {
+    if (!j.cerrada) {
+      const d = rel == null ? -1 : rel - j.ti;
+      if (d <= P.gracia) {
+        r.estado = 'programada';
+        r.detalle = d < 0 ? 'Turno sin empezar' : 'Todavía no ingresó';
+        return r;
+      }
+      r.demora = d;
+      r.enVivo = true;
+      r.estado = d <= P.rojo ? 'amarillo' : 'rojo';
+      r.detalle = 'Sin ingresar, ' + dur(d) + ' de demora';
+      return r;
+    }
+    r.estado = 'rojo';
+    r.detalle = 'Inasistencia';
+    r.inasistencia = true;
+    return r;
+  }
+  r.demora = Math.max(0, j.entrada - j.ti);
+  const desde = Math.max(j.entrada, j.ti);
+  r.desde = desde;
+  if (!j.cerrada) {
+    r.estado = 'en_curso';
+    r.detalle = r.demora > P.gracia ? 'En curso, llegó ' + dur(r.demora) + ' tarde' : 'En curso';
+    return r;
+  }
+  const sinSalida = j.salida == null;
+  const exc = sinSalida ? null : j.salida - j.tf;
+  const hayExc = sinSalida || exc > P.margen;
+  const disputa = !!(j.decl && j.decl.tipo === 'otras');
+  if ((hayExc || disputa) && !j.rev) {
+    r.pendiente = true;
+    r.estado = 'revision';
+    r.excedente = exc;
+    r.detalle = sinSalida ? 'En revisión: salida sin marcar' : hayExc ? 'En revisión: ' + dur(exc) + ' de más' : 'En revisión: horas declaradas distintas';
+    r.normales = Math.max(0, Math.min(sinSalida ? j.tf : j.salida, j.tf) - desde);
+    r.enRevision = hayExc && !sinSalida ? exc : 0;
+    return r;
+  }
+  const salidaVal = j.rev ? j.salidaVal : j.salida;
+  r.normales = Math.max(0, Math.min(salidaVal, j.tf) - desde);
+  if (j.rev === 'extra') r.extra = Math.max(0, salidaVal - j.tf);
+  if (r.demora > P.rojo) {
+    r.estado = 'rojo';
+    r.detalle = 'Llegada con ' + dur(r.demora) + ' de demora';
+  } else {
+    const obs = [];
+    if (r.demora > P.gracia) obs.push('llegada ' + dur(r.demora) + ' tarde');
+    if (j.rev === 'olvido') obs.push('salida sin marcar');
+    const antes = j.tf - salidaVal;
+    if (antes > P.gracia) obs.push('salida ' + dur(antes) + ' antes');
+    if (obs.length) { r.estado = 'amarillo'; r.detalle = cap(obs.join(', ')); }
+    else if (r.extra > 0) { r.estado = 'estrella'; r.detalle = 'Hora extra verificada: ' + dur(r.extra); }
+    else { r.estado = 'verde'; r.detalle = 'Jornada completa'; }
+  }
+  if (r.extra > 0 && r.estado !== 'estrella') r.detalle += '. Hora extra verificada: ' + dur(r.extra);
+  return r;
+}
+
+/* ---------- Consultas ---------- */
+
+function colab(S, id) { return S.colabs.find(c => c.id === id) || null; }
+function asig(S, id) { return S.asigs.find(a => a.id === id) || null; }
+function asigsDe(S, cId) { return S.asigs.filter(a => a.c === cId); }
+function porId(S, id) { return S.jornadas.find(j => j.id === id) || null; }
+function sedeNombre(S, id) { const s = S.sedes.find(x => x.id === id); return s ? s.nombre : ''; }
+function nombreCompleto(c) { return c ? c.nombre + (c.apellido ? ' ' + c.apellido : '') : ''; }
+/* La hora simulada en minutos relativos al día en que empezó el tramo. */
+function relDe(S, j) { return S.ahora + 1440 * diasEntre(j.f, S.hoy); }
+function ev(S, j) { return evaluar(j, S.P, relDe(S, j)); }
+function porInicio(a, b) { return a.f < b.f ? -1 : a.f > b.f ? 1 : a.ti - b.ti; }
+function activos(S) { return S.colabs.filter(c => S.asigs.some(a => a.c === c.id && a.activa)); }
+function colabSel(S) {
+  const act = activos(S);
+  let c = act.find(x => x.id === S.ui.colab) || null;
+  if (!c) {
+    c = act[0] || null;
+    S.ui.colab = c ? c.id : null;
+  }
+  return c;
+}
+/* Un tramo cuenta para hoy si empieza hoy, o si es un turno nocturno de ayer que sigue abierto o cerró pasada la medianoche. */
+function vivoHoy(S, j) {
+  if (j.f === S.hoy) return true;
+  if (j.tf <= 1440 || j.f !== sumarDias(S.hoy, -1)) return false;
+  return !j.cerrada || (j.salida != null && j.salida > 1440);
+}
+function tramosHoy(S, cId) { return S.jornadas.filter(j => j.c === cId && vivoHoy(S, j)).sort(porInicio); }
+function tramosDelDia(S) { return S.jornadas.filter(j => vivoHoy(S, j)); }
+/* El tramo sobre el que actúa el colaborador: el que está abierto o, si no hay, el próximo sin empezar. */
+function tramoActual(S, cId) {
+  const ts = tramosHoy(S, cId).filter(j => !j.justif);
+  return ts.find(j => !j.cerrada && j.entrada != null) || ts.find(j => !j.cerrada) || null;
+}
+function ultimoCerrado(S, cId) {
+  const ts = tramosHoy(S, cId).filter(j => j.cerrada && !j.justif);
+  return ts.length ? ts[ts.length - 1] : null;
+}
+function pendientes(S) {
+  return S.jornadas.filter(j => ev(S, j).pendiente).sort((a, b) => -porInicio(a, b));
+}
+function pendienteDeclarar(S, cId) {
+  let m = null;
+  for (const j of S.jornadas) {
+    if (j.c !== cId || !j.cerrada || j.entrada == null || j.salida != null || j.rev || j.decl || j.justif) continue;
+    if (!m || j.f > m.f) m = j;
+  }
+  return m;
+}
+/* Días seguidos sin observaciones. Un día cuenta si todos sus tramos quedaron en verde o estrella. */
+function racha(S, cId) {
+  const porDia = {};
+  for (const j of S.jornadas) if (j.c === cId) (porDia[j.f] = porDia[j.f] || []).push(j);
+  const fechas = Object.keys(porDia).sort().reverse();
+  let n = 0;
+  for (const f of fechas) {
+    const js = porDia[f];
+    if (js.some(j => !j.cerrada && !j.justif)) continue;
+    const es = js.map(j => ev(S, j).estado).filter(e => e !== 'justificada' && e !== 'revision');
+    if (!es.length) continue;
+    if (es.every(e => e === 'verde' || e === 'estrella')) n++;
+    else break;
+  }
+  return n;
+}
+
+/* ---------- Feriados ---------- */
+
+function feriadoEl(S, f) { return S.feriados.find(x => x.f === f) || null; }
+/* Minutos del intervalo relativo [a, b] de un tramo que caen en feriado o en día no laborable. */
+function minutosFeriado(S, j, a, b) {
+  const o = { feriado: 0, no_laborable: 0 };
+  for (let d = 0; d <= 2; d++) {
+    const ini = Math.max(a, d * 1440), fin = Math.min(b, (d + 1) * 1440);
+    if (fin <= ini) continue;
+    const x = feriadoEl(S, sumarDias(j.f, d));
+    if (x) o[x.tipo] += fin - ini;
+  }
+  return o;
+}
+function agregarFeriado(S, d) {
+  const nombre = String(d.nombre || '').trim();
+  if (!esFecha(d.f)) return 'Elegí la fecha.';
+  if (!nombre) return 'Escribí el nombre del feriado.';
+  if (!TIPOS_FERIADO[d.tipo]) return 'Elegí si es feriado o día no laborable.';
+  if (feriadoEl(S, d.f)) return 'Esa fecha ya está en el calendario.';
+  S.feriados.push({ f: d.f, nombre: nombre.slice(0, 80), tipo: d.tipo, propio: true });
+  S.feriados.sort((a, b) => (a.f < b.f ? -1 : 1));
+  return '';
+}
+function editarFeriado(S, f, tipo) {
+  const x = feriadoEl(S, f);
+  if (!x || !TIPOS_FERIADO[tipo]) return 'Elegí si es feriado o día no laborable.';
+  x.tipo = tipo;
+  return '';
+}
+function quitarFeriado(S, f) { S.feriados = S.feriados.filter(x => x.f !== f); }
+/* Para un feriado que viene: cuántos turnos por hora caen ese día y cuánto sumaría el recargo. */
+function impactoFeriado(S, x) {
+  const rec = x.tipo === 'feriado' ? S.P.recFeriado : S.P.recNoLab, ayer = sumarDias(x.f, -1);
+  const o = { turnos: 0, porHora: 0, minHora: 0, recargo: 0 };
+  for (const a of S.asigs) {
+    let min = 0;
+    if (trabajaEl(a, x.f) && !licenciaEl(S, a.c, x.f)) { o.turnos++; min += Math.min(a.tf, 1440) - a.ti; }
+    if (a.tf > 1440 && trabajaEl(a, ayer) && !licenciaEl(S, a.c, ayer)) min += a.tf - 1440;
+    if (!min || a.modalidad !== 'hora') continue;
+    o.porHora++;
+    o.minHora += min;
+    o.recargo += min / 60 * a.valor * rec / 100;
+  }
+  o.recargo = Math.round(o.recargo);
+  return o;
+}
+
+/* ---------- Resumen para la preliquidación ---------- */
+
+function resumen(S, filtro, mes) {
+  const o = { verde: 0, amarillo: 0, rojo: 0, estrella: 0, revision: 0, justificada: 0, jornadas: 0, asignadas: 0, normales: 0, extra: 0, enRevision: 0, sinSalida: 0, inasistencias: 0, cerradasPorColab: 0, conEntrada: 0, fer: { feriado: 0, no_laborable: 0 } };
+  for (const j of S.jornadas) {
+    if (mesDe(j.f) !== mes || !filtro(j)) continue;
+    const e = ev(S, j);
+    if (e.estado === 'justificada') { o.justificada++; continue; }
+    if (!j.cerrada) continue;
+    o.jornadas++;
+    o[e.estado]++;
+    o.asignadas += j.tf - j.ti;
+    o.normales += e.normales;
+    o.extra += e.extra;
+    o.enRevision += e.enRevision;
+    if (e.normales > 0) {
+      const m = minutosFeriado(S, j, e.desde, e.desde + e.normales);
+      o.fer.feriado += m.feriado;
+      o.fer.no_laborable += m.no_laborable;
+    }
+    if (e.pendiente && j.salida == null) o.sinSalida++;
+    if (e.inasistencia) o.inasistencias++;
+    if (j.entrada != null) { o.conEntrada++; if (j.metodoOut === 'qr') o.cerradasPorColab++; }
+  }
+  return o;
+}
+function resumenMes(S, cId, mes) { return resumen(S, j => j.c === cId, mes); }
+function resumenAsig(S, aId, mes) { return resumen(S, j => j.a === aId, mes); }
+/* Lo que suma el feriado trabajado en una asignación por hora, con el recargo que definió administración. */
+function recargoFeriado(S, a, r) {
+  if (a.modalidad !== 'hora') return 0;
+  return Math.round((r.fer.feriado * S.P.recFeriado + r.fer.no_laborable * S.P.recNoLab) / 100 * a.valor / 60);
+}
+/* Base de una asignación: por hora, horas validadas por valor más recargo de feriado; fija, su monto (el resto, según convenio). */
+function baseAsig(S, a, r) {
+  if (a.modalidad !== 'hora') return a.valor;
+  return Math.round(r.normales / 60 * a.valor) + recargoFeriado(S, a, r);
+}
+
+/* ---------- Topes de horas y avisos ---------- */
+
+function avisar(S, texto) {
+  S.avisos.unshift({ id: 'v' + (S.sig++), f: S.hoy, m: S.ahora, texto: texto });
+  if (S.avisos.length > 20) S.avisos.length = 20;
+}
+function quitarAviso(S, id) { S.avisos = S.avisos.filter(x => x.id !== id); }
+/* Tope del día para una persona: el de por hora si ese día tiene algún turno por hora, si no el de fijo. */
+function topeDelDia(S, cId, f) {
+  const hayHora = S.jornadas.some(j => j.c === cId && j.f === f && (asig(S, j.a) || {}).modalidad === 'hora');
+  return hayHora ? S.P.topeHora : S.P.topeFijo;
+}
+function minutosDelDia(S, cId, f) {
+  let n = 0;
+  for (const j of S.jornadas) {
+    if (j.c !== cId || j.f !== f || j.entrada == null) continue;
+    const sal = j.rev ? j.salidaVal : (j.salida != null ? j.salida : j.tf);
+    n += Math.max(0, sal - j.entrada);
+  }
+  return n;
+}
+/* Avisos de planificación de las próximas cuatro semanas: topes diarios y traslado entre sedes. */
+function alertas(S) {
+  const out = [];
+  const sumar = (mapa, k, d) => { const l = (mapa[k] = mapa[k] || []); if (l.indexOf(d) < 0) l.push(d); };
+  for (const c of S.colabs) {
+    const porFijo = {}, porTotal = {}, porPar = {};
+    for (let i = 0; i < 28; i++) {
+      const f = sumarDias(S.hoy, i);
+      if (licenciaEl(S, c.id, f)) continue;
+      const d = dIso(f);
+      const delDia = S.asigs.filter(a => a.c === c.id && trabajaEl(a, f)).sort((x, y) => x.ti - y.ti);
+      if (!delDia.length) continue;
+      const fijo = delDia.reduce((n, a) => n + (a.modalidad === 'fijo' ? a.tf - a.ti : 0), 0);
+      const total = delDia.reduce((n, a) => n + (a.tf - a.ti), 0);
+      if (fijo > S.P.topeFijo * 60) sumar(porFijo, fijo, d);
+      if (delDia.some(a => a.modalidad === 'hora') && total > S.P.topeHora * 60) sumar(porTotal, total, d);
+      for (let k = 1; k < delDia.length; k++) {
+        const p = delDia[k - 1], q = delDia[k], gap = q.ti - p.tf;
+        if (p.sede !== q.sede && gap < S.P.traslado) {
+          const x = (porPar[p.id + '|' + q.id] = porPar[p.id + '|' + q.id] || { p: p, q: q, gap: gap, dias: [] });
+          if (x.dias.indexOf(d) < 0) x.dias.push(d);
+        }
+      }
+    }
+    const n = nombreCompleto(c);
+    for (const t of Object.keys(porFijo)) out.push({ tipo: 'tope', c: c.id, texto: n + ' suma ' + dur(Number(t)) + ' en asignaciones fijas ' + listaDias(porFijo[t]) + ', por encima del tope de ' + S.P.topeFijo + ' h.' });
+    for (const t of Object.keys(porTotal)) out.push({ tipo: 'tope', c: c.id, texto: n + ' suma ' + dur(Number(t)) + ' ' + listaDias(porTotal[t]) + ', por encima del tope de ' + S.P.topeHora + ' h para quien trabaja por hora.' });
+    for (const k of Object.keys(porPar)) {
+      const x = porPar[k];
+      out.push({ tipo: 'traslado', c: c.id, texto: n + ' tiene ' + dur(Math.max(0, x.gap)) + ' entre ' + sedeNombre(S, x.p.sede) + ' y ' + sedeNombre(S, x.q.sede) + ' ' + listaDias(x.dias) + ', menos que el mínimo de ' + S.P.traslado + ' min para trasladarse.' });
+    }
+  }
+  return out;
+}
+/* Corre un cambio de asignaciones y le avisa al supervisor si aparece un exceso de tope nuevo. */
+function conAvisoDeTope(S, cambio) {
+  const antes = alertas(S).filter(x => x.tipo === 'tope').map(x => x.texto);
+  const err = cambio();
+  if (err) return err;
+  for (const x of alertas(S)) if (x.tipo === 'tope' && antes.indexOf(x.texto) < 0) avisar(S, 'Asignación por encima del tope. ' + x.texto);
+  return '';
+}
+
+/* ---------- Tramos y simulación del resto del equipo ---------- */
+
+function nuevaJornada(S, a, f, guion) {
+  return {
+    id: 'j' + (S.sig++), a: a.id, c: a.c, f: f, sede: a.sede, ti: a.ti, tf: a.tf,
+    entrada: null, salida: null, metodoIn: null, metodoOut: null, cerrada: false, conf: false,
+    decl: null, rev: null, salidaVal: null, justif: null, descargo: null,
+    guion: guion || null, manual: false, tocada: false
+  };
+}
+function trabajaEl(a, f) { return a.activa && a.dias.indexOf(dIso(f)) >= 0 && vigente(a, f); }
+function guionAleatorio(S, a) {
+  const r = rnd(S), ti = a.ti, tf = a.tf;
+  if (r < 0.70) return { in: ti + ent(S, -6, 4), out: tf + ent(S, 0, 8) };
+  if (r < 0.78) return { in: ti + ent(S, 6, 14), out: tf + ent(S, 0, 6) };
+  if (r < 0.82) return { in: ti + ent(S, 17, 40), out: tf + ent(S, 0, 6) };
+  if (r < 0.89) return { in: ti + ent(S, -5, 3), out: tf + ent(S, 35, 120), decl: { tipo: 'extra', hora: null, texto: MOTIVOS_EXTRA[ent(S, 0, MOTIVOS_EXTRA.length - 1)] } };
+  if (r < 0.93) return { in: ti + ent(S, -5, 3), out: null };
+  if (r < 0.96) return { in: ti + ent(S, -5, 3), out: tf - ent(S, 10, 40) };
+  return { in: null, out: null };
+}
+/* Hace avanzar a quienes no maneja el usuario según su guion, hasta la hora simulada. */
+function tick(S) {
+  const ayer = sumarDias(S.hoy, -1);
+  for (const j of S.jornadas) {
+    if ((j.f !== S.hoy && j.f !== ayer) || j.cerrada || j.manual || j.justif || !j.guion) continue;
+    const g = j.guion, rel = relDe(S, j);
+    if (j.entrada == null && g.in != null && rel >= g.in) { j.entrada = g.in; j.metodoIn = 'qr'; }
+    if (j.entrada != null && j.salida == null && g.out != null && rel >= g.out) {
+      j.salida = g.out; j.metodoOut = 'qr'; j.cerrada = true;
+      if (g.out - j.tf > S.P.margen) j.decl = g.decl || null; else j.conf = true;
+    }
+  }
+}
+/* El teléfono de la demo maneja los tramos de una persona; los que no tocó vuelven a su guion al soltarla. */
+function tomarControl(S, cId) { for (const j of tramosHoy(S, cId)) if (!j.cerrada) j.manual = true; }
+function soltarControl(S, cId) { for (const j of tramosHoy(S, cId)) if (j.manual && !j.tocada) j.manual = false; }
+function elegirColab(S, id) {
+  if (S.ui.colab) soltarControl(S, S.ui.colab);
+  S.ui.colab = id;
+  tomarControl(S, id);
+  tick(S);
+}
+function avanzarDia(S) {
+  for (const j of S.jornadas) if (!j.cerrada && j.manual && !j.tocada) j.manual = false;
+  S.ahora = 1439;
+  tick(S);
+  for (const j of S.jornadas) {
+    if (j.cerrada) continue;
+    if (j.f === S.hoy && j.tf > 1440) continue;
+    j.cerrada = true;
+    if (j.entrada != null && j.salida == null) j.metodoOut = 'auto';
+  }
+  S.hoy = sumarDias(S.hoy, 1);
+  for (const a of S.asigs) if (trabajaEl(a, S.hoy)) S.jornadas.push(nuevaJornada(S, a, S.hoy, guionAleatorio(S, a)));
+  aplicarLicenciasHoy(S);
+  const c = colabSel(S);
+  let inicio = 470;
+  if (c) {
+    const ts = tramosHoy(S, c.id).filter(j => !j.cerrada && !j.justif);
+    const abierto = ts.find(j => j.entrada != null);
+    if (abierto) inicio = abierto.tf - 1440 * diasEntre(abierto.f, S.hoy) - 10;
+    else if (ts.length) inicio = ts[0].ti - 1440 * diasEntre(ts[0].f, S.hoy) - 10;
+  }
+  S.ahora = Math.min(1439, Math.max(0, inicio));
+  if (c) tomarControl(S, c.id);
+  tick(S);
+}
+
+/* ---------- Acciones del colaborador ---------- */
+
+function marcarEntrada(S, jId, metodo) {
+  const j = porId(S, jId);
+  if (!j || !vivoHoy(S, j) || j.cerrada || j.entrada != null || j.justif) return null;
+  j.entrada = relDe(S, j); j.metodoIn = metodo || 'qr'; j.manual = true; j.tocada = true;
+  return j;
+}
+function cerrarJornada(S, jId, datos, metodo) {
+  const j = porId(S, jId);
+  if (!j || !vivoHoy(S, j) || j.cerrada || j.entrada == null) return null;
+  j.salida = Math.max(relDe(S, j), j.entrada);
+  j.metodoOut = metodo || 'qr'; j.cerrada = true; j.manual = true; j.tocada = true;
+  j.conf = !!(datos && datos.conf);
+  j.decl = (datos && datos.decl) || null;
+  return j;
+}
+/* `hora` es la hora del día que declara el colaborador. */
+function declararOlvido(S, jId, hora) {
+  const j = porId(S, jId);
+  if (!j) return 'No se encontró la jornada.';
+  const h = aRel(j, hora);
+  if (h == null) return 'Indicá a qué hora terminaste.';
+  if (h <= j.entrada) return 'La salida tiene que ser posterior a tu entrada de las ' + hm(j.entrada) + '.';
+  j.decl = { tipo: 'olvido', hora: h, texto: '' };
+  return '';
+}
+function enviarDescargo(S, jId, texto) {
+  const j = porId(S, jId);
+  const t = String(texto || '').trim();
+  if (!j) return 'No se encontró la jornada.';
+  if (!t) return 'Escribí qué pasó antes de enviar.';
+  j.descargo = t.slice(0, 280);
+  return '';
+}
+/* La sede donde está o estuvo recién la persona: sirve de valor inicial para una novedad. */
+function sedeActual(S, cId) {
+  const ts = tramosHoy(S, cId).filter(j => !j.justif);
+  const t = ts.find(j => !j.cerrada && j.entrada != null) || ultimoCerrado(S, cId) || ts[0];
+  if (t) return t.sede;
+  const a = asigsDe(S, cId)[0];
+  return a ? a.sede : '';
+}
+function agregarNovedad(S, cId, d) {
+  const t = String(d.texto || '').trim();
+  if (!TIPOS_NOV[d.tipo]) return 'Elegí de qué se trata.';
+  if (!CRITICIDAD[d.crit]) return 'Elegí la urgencia.';
+  if (!t) return 'Contá qué pasó antes de enviar.';
+  const sede = d.sede && S.sedes.some(s => s.id === d.sede) ? d.sede : sedeActual(S, cId);
+  S.novedades.unshift({ id: 'n' + (S.sig++), c: cId, sede: sede, tipo: d.tipo, crit: d.crit, texto: t.slice(0, 400), foto: d.foto || '', f: S.hoy, m: S.ahora, estado: 'abierta' });
+  return '';
+}
+
+/* ---------- Acciones del supervisor ---------- */
+
+function anotar(S, tipo, jId, texto) {
+  S.bitacora.unshift({ id: 'b' + (S.sig++), f: S.hoy, m: S.ahora, tipo: tipo, j: jId, texto: texto });
+  if (S.bitacora.length > 40) S.bitacora.length = 40;
+}
+function quienDonde(S, j) { return nombreCompleto(colab(S, j.c)) + ', ' + fechaCorta(j.f) + ' en ' + sedeNombre(S, j.sede); }
+function textoResolucion(S, j) {
+  const quien = quienDonde(S, j) + ': ';
+  if (j.rev === 'extra') return quien + 'hora extra verificada, ' + dur(j.salidaVal - j.tf);
+  if (j.rev === 'olvido') return quien + 'olvido de salida, validada a las ' + hm(j.salidaVal);
+  if (j.rev === 'ajuste') return quien + 'salida corregida a las ' + hm(j.salidaVal);
+  return quien + 'se mantiene el registro';
+}
+/* `hora` es la hora del día que valida el supervisor. */
+function resolver(S, jId, tipo, hora) {
+  const j = porId(S, jId);
+  if (!j) return 'No se encontró la jornada.';
+  if (['extra', 'olvido', 'ajuste', 'ok'].indexOf(tipo) < 0) return 'Elegí qué pasó.';
+  const h = tipo === 'ok' ? j.salida : aRel(j, hora);
+  if (h == null) return 'Indicá la salida validada.';
+  if (h <= j.entrada) return 'La salida tiene que ser posterior a la entrada de las ' + hm(j.entrada) + '.';
+  if (tipo === 'extra' && h <= j.tf) return 'Para hora extra, la salida validada tiene que ser posterior a las ' + hm(j.tf) + '.';
+  j.rev = tipo; j.salidaVal = h;
+  anotar(S, 'rev', j.id, textoResolucion(S, j));
+  return '';
+}
+function justificar(S, jId, motivo) {
+  const j = porId(S, jId);
+  if (!j || !MOTIVOS[motivo]) return 'Elegí un motivo.';
+  j.justif = motivo;
+  anotar(S, 'justif', j.id, quienDonde(S, j) + ': inasistencia justificada, ' + MOTIVOS[motivo].toLowerCase());
+  return '';
+}
+function deshacer(S, bId) {
+  const i = S.bitacora.findIndex(b => b.id === bId);
+  if (i < 0) return;
+  const b = S.bitacora[i], j = porId(S, b.j);
+  if (j && b.tipo === 'rev') { j.rev = null; j.salidaVal = null; }
+  if (j && b.tipo === 'justif') j.justif = null;
+  S.bitacora.splice(i, 1);
+}
+function fichajeAsistido(S, jId) {
+  const j = porId(S, jId);
+  if (!j || !vivoHoy(S, j) || j.cerrada || j.justif) return '';
+  const quien = nombreCompleto(colab(S, j.c)) + ' en ' + sedeNombre(S, j.sede);
+  j.manual = true; j.tocada = true;
+  if (j.entrada == null) {
+    j.entrada = relDe(S, j); j.metodoIn = 'supervisor';
+    anotar(S, 'asistido', j.id, quien + ': entrada asistida a las ' + hm(j.entrada));
+    return 'entrada';
+  }
+  j.salida = Math.max(relDe(S, j), j.entrada); j.metodoOut = 'supervisor'; j.cerrada = true;
+  anotar(S, 'asistido', j.id, quien + ': salida asistida a las ' + hm(j.salida));
+  return 'salida';
+}
+function estadoNovedad(S, nId, estado) {
+  const n = S.novedades.find(x => x.id === nId);
+  if (n && ESTADOS_NOV[estado]) n.estado = estado;
+}
+
+/* ---------- Acciones de administración ---------- */
+
+function partirNombre(t) { const p = String(t).trim().split(/\s+/); return { nombre: p.shift() || '', apellido: p.join(' ') }; }
+function editarNombre(S, cId, valor) {
+  const c = colab(S, cId), n = partirNombre(valor);
+  if (!c) return 'No se encontró el colaborador.';
+  if (!n.nombre) return 'El nombre no puede quedar vacío.';
+  c.nombre = n.nombre.slice(0, 30); c.apellido = n.apellido.slice(0, 40);
+  return '';
+}
+/* ¿Se pisan dos turnos semanales? Tiene en cuenta los que cruzan la medianoche. */
+function sePisan(x, y) {
+  for (const d of x.dias) for (const e of y.dias) for (const k of [-1, 0, 1]) {
+    if (((e - d - k) % 7 + 7) % 7 !== 0) continue;
+    if (x.ti < y.tf + 1440 * k && y.ti + 1440 * k < x.tf) return true;
+  }
+  return false;
+}
+/* Reglas de una asignación: una sola por sede para cada persona y sin superposición de horarios. */
+function validarAsig(S, cand, ignorarId) {
+  if (!S.sedes.some(s => s.id === cand.sede)) return 'Elegí una sede de la lista.';
+  if (cand.ti == null || cand.tf == null) return 'Completá el horario del turno.';
+  if (cand.tf <= cand.ti || cand.tf - cand.ti > 1440) return 'Revisá el horario del turno.';
+  if (!cand.dias || !cand.dias.length) return 'Elegí al menos un día de trabajo.';
+  if (cand.modalidad !== 'fijo' && cand.modalidad !== 'hora') return 'Elegí fijo o por hora.';
+  if (!(cand.valor > 0)) return 'El valor tiene que ser mayor que cero.';
+  if (cand.desde && cand.hasta && cand.hasta < cand.desde) return 'La vigencia tiene que terminar después de empezar.';
+  for (const o of S.asigs) {
+    if (o.id === ignorarId || o.c !== cand.c || !seCruzan(o, cand)) continue;
+    if (o.sede === cand.sede) return 'Ya tiene una asignación en ' + sedeNombre(S, o.sede) + '. En la misma sede, el tiempo de más se registra como hora extra.';
+    if (!o.activa || !cand.activa) continue;
+    if (sePisan(cand, o)) return 'Se superpone con su turno de ' + hm(o.ti) + ' a ' + hm(o.tf) + ' en ' + sedeNombre(S, o.sede) + '.';
+  }
+  return '';
+}
+function editarAsig(S, id, campo, valor, dia) {
+  const a = asig(S, id);
+  if (!a) return 'No se encontró la asignación.';
+  const cand = { c: a.c, sede: a.sede, dias: a.dias.slice(), ti: a.ti, tf: a.tf, modalidad: a.modalidad, valor: a.valor, activa: a.activa, desde: a.desde || null, hasta: a.hasta || null };
+  if (campo === 'sede') cand.sede = valor;
+  else if (campo === 'ti' || campo === 'tf') {
+    const m = aMin(valor);
+    if (m == null) return 'Escribí una hora válida.';
+    if (campo === 'ti') { cand.ti = m; cand.tf = finRel(m, a.tf % 1440); } else cand.tf = finRel(a.ti, m);
+  }
+  else if (campo === 'modalidad') { if (valor !== a.modalidad) { cand.modalidad = valor; cand.valor = S.ref[valor] || cand.valor; } }
+  else if (campo === 'valor') cand.valor = Math.round(Number(valor));
+  else if (campo === 'activa') cand.activa = !!valor;
+  else if (campo === 'dia') {
+    const d = Number(dia), i = cand.dias.indexOf(d);
+    if (valor && i < 0) cand.dias.push(d);
+    if (!valor && i >= 0) cand.dias.splice(i, 1);
+    cand.dias.sort((x, y) => x - y);
+  }
+  return conAvisoDeTope(S, () => {
+    const err = validarAsig(S, cand, id);
+    if (!err) Object.assign(a, cand);
+    return err;
+  });
+}
+function agregarAsig(S, d) {
+  let c = null, nuevo = null;
+  if (d.colab === 'nuevo') {
+    nuevo = partirNombre(d.nombre || '');
+    if (!nuevo.nombre) return 'Escribí el nombre del colaborador.';
+  } else {
+    c = colab(S, d.colab);
+    if (!c) return 'Elegí un colaborador.';
+  }
+  const desde = d.desde ? String(d.desde) : null, hasta = d.hasta ? String(d.hasta) : null;
+  if ((desde && !esFecha(desde)) || (hasta && !esFecha(hasta))) return 'Revisá las fechas de vigencia.';
+  const ti = aMin(d.ti), fin = aMin(d.tf);
+  const cand = { c: c ? c.id : '', sede: d.sede, dias: diasValidos(d.dias), ti: ti, tf: ti == null || fin == null ? null : finRel(ti, fin), modalidad: d.modalidad, valor: Math.round(Number(d.valor)), activa: true, desde: desde, hasta: hasta };
+  return conAvisoDeTope(S, () => {
+    const err = validarAsig(S, cand, null);
+    if (err) return err;
+    if (nuevo) {
+      c = { id: 'c' + (S.sig++), nombre: nuevo.nombre.slice(0, 30), apellido: nuevo.apellido.slice(0, 40) };
+      S.colabs.push(c);
+      cand.c = c.id;
+    }
+    const a = Object.assign({ id: 'a' + (S.sig++) }, cand);
+    S.asigs.push(a);
+    if (trabajaEl(a, S.hoy)) {
+      const j = nuevaJornada(S, a, S.hoy, guionAleatorio(S, a));
+      if (S.ui.colab === c.id) j.manual = true;
+      S.jornadas.push(j);
+      aplicarLicenciasHoy(S);
+      tick(S);
+    }
+    return '';
+  });
+}
+function ponerParam(S, k, v) {
+  const lim = { gracia: [0, 180], rojo: [0, 180], margen: [0, 180], topeFijo: [1, 24], topeHora: [1, 24], traslado: [0, 180], recFeriado: [0, 300], recNoLab: [0, 300] };
+  if (!lim[k]) return '';
+  const n = Math.round(Number(v));
+  if (v === '' || !(n >= lim[k][0] && n <= lim[k][1])) return 'Usá un número entre ' + lim[k][0] + ' y ' + lim[k][1] + '.';
+  const P = Object.assign({}, S.P);
+  P[k] = n;
+  if (P.rojo < P.gracia) return 'La demora que pasa a rojo no puede ser menor que la gracia de llegada.';
+  const antes = S.P[k];
+  S.P = P;
+  if ((k === 'topeFijo' || k === 'topeHora') && antes !== n) {
+    const ids = [];
+    for (const x of alertas(S)) if (x.tipo === 'tope' && ids.indexOf(x.c) < 0) ids.push(x.c);
+    const quienes = ids.map(id => nombreCompleto(colab(S, id)));
+    avisar(S, 'Administración cambió el tope diario de ' + (k === 'topeFijo' ? 'las asignaciones fijas' : 'quienes trabajan por hora') + ' de ' + antes + ' a ' + n + ' h.' +
+      (quienes.length ? ' Con las asignaciones actuales ' + (quienes.length === 1 ? 'queda' : 'quedan') + ' por encima: ' + enLista(quienes) + '.' : ''));
+  }
+  return '';
+}
+
+/* ---------- Licencias y vacaciones ---------- */
+
+function licenciaEl(S, cId, f) { return S.licencias.find(l => l.c === cId && l.desde <= f && f <= l.hasta) || null; }
+/* Quien tiene una ausencia cargada para hoy y todavía no empezó su turno queda justificado y no ficha. */
+function aplicarLicenciasHoy(S) {
+  for (const j of S.jornadas) {
+    if (j.f !== S.hoy || j.cerrada || j.entrada != null || j.justif) continue;
+    const l = licenciaEl(S, j.c, S.hoy);
+    if (l) { j.justif = l.tipo; j.lic = l.id; j.cerrada = true; }
+  }
+}
+function agregarLicencia(S, d) {
+  const c = colab(S, d.colab);
+  if (!c) return 'Elegí un colaborador.';
+  if (!TIPOS_LIC[d.tipo]) return 'Elegí el tipo de ausencia.';
+  if (!esFecha(d.desde) || !esFecha(d.hasta)) return 'Completá las dos fechas.';
+  if (d.hasta < d.desde) return 'El último día no puede ser anterior al primero.';
+  if (S.licencias.some(l => l.c === c.id && l.desde <= d.hasta && d.desde <= l.hasta)) return 'Ya tiene una ausencia cargada en esas fechas.';
+  S.licencias.push({ id: 'l' + (S.sig++), c: c.id, tipo: d.tipo, desde: d.desde, hasta: d.hasta });
+  aplicarLicenciasHoy(S);
+  return '';
+}
+function quitarLicencia(S, id) {
+  const i = S.licencias.findIndex(l => l.id === id);
+  if (i < 0) return;
+  S.licencias.splice(i, 1);
+  for (const j of S.jornadas) if (j.f === S.hoy && j.lic === id) { j.justif = null; j.lic = null; j.cerrada = false; }
+  tick(S);
+}
+function proximaLicencia(S, cId) {
+  let m = null;
+  for (const l of S.licencias) if (l.c === cId && l.hasta >= S.hoy && (!m || l.desde < m.desde)) m = l;
+  return m;
+}
+
+/* ---------- Horario contratado por sede y cobertura ---------- */
+
+function validarFranja(S, fr) {
+  if (!S.sedes.some(s => s.id === fr.sede)) return 'Elegí una sede.';
+  if (fr.ti == null || fr.tf == null) return 'Completá el horario contratado.';
+  if (fr.tf <= fr.ti || fr.tf - fr.ti > 1440) return 'Revisá el horario contratado.';
+  if (!fr.dias || !fr.dias.length) return 'Elegí al menos un día.';
+  if (!(fr.dot >= 1 && fr.dot <= 30)) return 'La dotación tiene que ser de 1 a 30 personas.';
+  return '';
+}
+function agregarFranja(S, d) {
+  const ti = aMin(d.ti), fin = aMin(d.tf);
+  const fr = { sede: d.sede, dias: diasValidos(d.dias), ti: ti, tf: ti == null || fin == null ? null : finRel(ti, fin), dot: Math.round(Number(d.dot)) };
+  const err = validarFranja(S, fr);
+  if (err) return err;
+  fr.id = 'f' + (S.sig++);
+  S.franjas.push(fr);
+  return '';
+}
+function editarFranja(S, id, campo, valor, dia) {
+  const fr = S.franjas.find(x => x.id === id);
+  if (!fr) return 'No se encontró la franja.';
+  const cand = { sede: fr.sede, dias: fr.dias.slice(), ti: fr.ti, tf: fr.tf, dot: fr.dot };
+  if (campo === 'ti' || campo === 'tf') {
+    const m = aMin(valor);
+    if (m == null) return 'Escribí una hora válida.';
+    if (campo === 'ti') { cand.ti = m; cand.tf = finRel(m, fr.tf % 1440); } else cand.tf = finRel(fr.ti, m);
+  }
+  else if (campo === 'dot') cand.dot = Math.round(Number(valor));
+  else if (campo === 'dia') {
+    const d = Number(dia), i = cand.dias.indexOf(d);
+    if (valor && i < 0) cand.dias.push(d);
+    if (!valor && i >= 0) cand.dias.splice(i, 1);
+    cand.dias.sort((x, y) => x - y);
+  }
+  const err = validarFranja(S, cand);
+  if (err) return err;
+  Object.assign(fr, cand);
+  return '';
+}
+function quitarFranja(S, id) { S.franjas = S.franjas.filter(x => x.id !== id); }
+
+/* Para una sede y una fecha, de 00:00 a 24:00: qué pide el contrato, quién está asignado y en qué tramos falta gente.
+   Incluye la parte de madrugada de los turnos y franjas que empezaron el día anterior. */
+function coberturaDia(S, sedeId, f) {
+  const ayer = sumarDias(f, -1), d = dIso(f), dA = dIso(ayer);
+  const o = { f: f, feriado: feriadoEl(S, f), franjas: [], personas: [], segmentos: [], falta: false };
+  for (const x of S.franjas) {
+    if (x.sede !== sedeId) continue;
+    if (x.dias.indexOf(d) >= 0) o.franjas.push({ x: x, ti: x.ti, tf: Math.min(x.tf, 1440), dot: x.dot });
+    if (x.tf > 1440 && x.dias.indexOf(dA) >= 0) o.franjas.push({ x: x, ti: 0, tf: x.tf - 1440, dot: x.dot, viene: true });
+  }
+  for (const a of S.asigs) {
+    if (a.sede !== sedeId) continue;
+    if (trabajaEl(a, f)) o.personas.push({ a: a, c: colab(S, a.c), ti: a.ti, tf: Math.min(a.tf, 1440), lic: licenciaEl(S, a.c, f) });
+    if (a.tf > 1440 && trabajaEl(a, ayer)) o.personas.push({ a: a, c: colab(S, a.c), ti: 0, tf: a.tf - 1440, lic: licenciaEl(S, a.c, ayer), viene: true });
+  }
+  o.franjas.sort((x, y) => x.ti - y.ti);
+  o.personas.sort((x, y) => x.ti - y.ti || (x.a.id < y.a.id ? -1 : 1));
+  const cortes = {};
+  for (const x of o.franjas) { cortes[x.ti] = 1; cortes[x.tf] = 1; }
+  for (const p of o.personas) { cortes[p.ti] = 1; cortes[p.tf] = 1; }
+  const pts = Object.keys(cortes).map(Number).sort((a, b) => a - b);
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const ini = pts[i], fin = pts[i + 1];
+    const req = o.franjas.reduce((n, x) => n + (x.ti <= ini && fin <= x.tf ? x.dot : 0), 0);
+    if (!req) continue;
+    const pres = o.personas.filter(p => !p.lic && p.ti <= ini && fin <= p.tf).length;
+    const ult = o.segmentos[o.segmentos.length - 1];
+    if (ult && ult.tf === ini && ult.req === req && ult.pres === pres) ult.tf = fin;
+    else o.segmentos.push({ ti: ini, tf: fin, req: req, pres: pres, falta: Math.max(0, req - pres) });
+  }
+  o.falta = o.segmentos.some(g => g.falta > 0);
+  return o;
+}
+function causaHueco(o, g) {
+  const aus = o.personas.filter(p => p.lic && p.ti < g.tf && g.ti < p.tf);
+  if (aus.length) return aus.map(p => nombreCompleto(p.c) + ' ' + LIC_FRASE[p.lic.tipo]).join(' y ');
+  return 'sin asignación';
+}
+/* Franjas contratadas sin cubrir desde hoy, agrupadas cuando se repiten. Un hueco de noche se cuenta entero,
+   desde el día en que empieza, aunque cruce la medianoche. */
+function huecos(S, dias) {
+  const piezas = [];
+  for (const s of S.sedes) {
+    let cola = null;
+    for (let i = 0; i < dias; i++) {
+      const f = sumarDias(S.hoy, i), o = coberturaDia(S, s.id, f), hs = [];
+      for (const g of o.segmentos) {
+        if (!g.falta) continue;
+        const causa = causaHueco(o, g), u = hs[hs.length - 1];
+        if (u && u.tf === g.ti && u.falta === g.falta && u.causa === causa) u.tf = g.tf;
+        else hs.push({ ti: g.ti, tf: g.tf, falta: g.falta, causa: causa });
+      }
+      let nueva = null;
+      for (const h of hs) {
+        if (h.ti === 0 && h.tf < 1440 && cola && cola.falta === h.falta && cola.causa === h.causa) { cola.tf = 1440 + h.tf; continue; }
+        const p = { sede: s.id, f: f, ti: h.ti, tf: h.tf, falta: h.falta, causa: h.causa };
+        piezas.push(p);
+        if (h.tf === 1440 && h.ti > 0) nueva = p;
+      }
+      cola = nueva;
+    }
+  }
+  const grupos = {}, orden = [];
+  for (const p of piezas) {
+    const k = [p.sede, p.ti, p.tf, p.falta, p.causa].join('|');
+    if (!grupos[k]) { grupos[k] = { sede: p.sede, ti: p.ti, tf: p.tf, falta: p.falta, causa: p.causa, fechas: [] }; orden.push(k); }
+    grupos[k].fechas.push(p.f);
+  }
+  return orden.map(k => grupos[k]).sort((a, b) => (a.fechas[0] < b.fechas[0] ? -1 : a.fechas[0] > b.fechas[0] ? 1 : 0));
+}
+
+/* ---------- Datos de ejemplo ---------- */
+
+const CURADO = {
+  a1: {
+    '2026-11-02': [477, 842], '2026-11-03': [479, 845], '2026-11-04': [481, 840], '2026-11-05': [476, 843], '2026-11-06': [480, 841],
+    '2026-11-09': [478, 844], '2026-11-10': [491, 842], '2026-11-11': [479, 840], '2026-11-12': [482, 846], '2026-11-13': [480, 843],
+    '2026-11-16': [477, 841], '2026-11-17': [483, 840], '2026-11-18': 'licencia', '2026-11-19': [480, 845], '2026-11-20': 'ausente',
+    '2026-11-23': [479, 841],
+    '2026-11-24': [480, 1000, { pendiente: true, decl: { tipo: 'extra', hora: null, texto: 'Me quedé a terminar la limpieza profunda del salón.' } }],
+    '2026-11-25': [489, 840],
+    '2026-11-26': [480, 910, { rev: 'extra' }]
+  },
+  a2: {
+    '2026-11-12': [445, 783],
+    '2026-11-26': [418, null, { pendiente: true }]
+  },
+  a7: {
+    '2026-11-04': [898, 1081], '2026-11-06': [900, 1080], '2026-11-11': [899, 1083], '2026-11-13': [897, 1080],
+    '2026-11-18': 'licencia', '2026-11-20': 'ausente', '2026-11-25': [901, 1082]
+  },
+  a8: {}
+};
+const GUION_HOY = {
+  a2: { in: 421, out: 784 },
+  a3: { in: 478, out: 852 },
+  a4: { in: 837, out: 1203 },
+  a5: { in: 852, out: 1204 },
+  a6: { in: 420, out: 830, decl: { tipo: 'extra', hora: null, texto: 'Cubrí el sector de un compañero hasta que llegó el relevo.' } },
+  a7: { in: 899, out: 1082 }
+};
+
+function historica(S, a, f) {
+  const j = nuevaJornada(S, a, f);
+  j.cerrada = true;
+  const cur = CURADO[a.id] && CURADO[a.id][f];
+  if (cur === 'licencia') { j.justif = 'licencia'; return j; }
+  if (cur === 'ausente') return j;
+  let g, extra = {};
+  if (cur) {
+    g = { in: cur[0], out: cur[1] };
+    extra = cur[2] || {};
+    if (extra.decl) g.decl = extra.decl;
+  } else if (CURADO[a.id]) {
+    g = { in: a.ti + ent(S, -4, 3), out: a.tf + ent(S, 0, 7) };
+  } else {
+    g = guionAleatorio(S, a);
+  }
+  if (g.in == null) {
+    if (rnd(S) < 0.5) j.justif = 'aviso';
+    return j;
+  }
+  j.entrada = g.in; j.metodoIn = 'qr';
+  if (g.out == null) {
+    j.metodoOut = 'auto';
+  } else {
+    j.salida = g.out; j.metodoOut = 'qr';
+    if (g.out - j.tf > S.P.margen) j.decl = g.decl || null; else j.conf = true;
+  }
+  if (extra.pendiente) return j;
+  if (extra.rev) { j.rev = extra.rev; j.salidaVal = j.salida; return j; }
+  if (ev(S, j).pendiente) {
+    if (j.salida == null) { j.rev = 'olvido'; j.salidaVal = j.tf; }
+    else { j.rev = 'extra'; j.salidaVal = j.salida; }
+  }
+  return j;
+}
+
+function sembrar() {
+  const L = [1, 2, 3, 4, 5];
+  const S = {
+    v: VERSION, rng: 20261127, sig: 1, hoy: INICIO, ahora: 14 * 60 + 5,
+    P: { gracia: 5, rojo: 15, margen: 15, topeFijo: 8, topeHora: 10, traslado: 30, recFeriado: SUGERIDO.recFeriado, recNoLab: SUGERIDO.recNoLab },
+    ref: { hora: 6500, fijo: 950000 },
+    sedes: [{ id: 'centro', nombre: 'Sede Centro' }, { id: 'norte', nombre: 'Sede Norte' }, { id: 'parque', nombre: 'Sede Parque' }],
+    colabs: [
+      { id: 'c1', nombre: 'Marta', apellido: 'Giménez' },
+      { id: 'c2', nombre: 'Diego', apellido: 'Rojas' },
+      { id: 'c3', nombre: 'Lucía', apellido: 'Paredes' },
+      { id: 'c4', nombre: 'Ramón', apellido: 'Ortiz' },
+      { id: 'c5', nombre: 'Carla', apellido: 'Sosa' },
+      { id: 'c6', nombre: 'Néstor', apellido: 'Vega' },
+      { id: 'c7', nombre: 'Hugo', apellido: 'Luna' },
+      { id: 'c8', nombre: 'Paula', apellido: 'Funes' }
+    ],
+    asigs: [
+      { id: 'a1', c: 'c1', sede: 'centro', dias: L.slice(), ti: 480, tf: 840, modalidad: 'fijo', valor: 950000 },
+      { id: 'a2', c: 'c2', sede: 'norte', dias: L.slice(), ti: 420, tf: 780, modalidad: 'hora', valor: 6500 },
+      { id: 'a3', c: 'c3', sede: 'centro', dias: L.slice(), ti: 480, tf: 840, modalidad: 'hora', valor: 6500 },
+      { id: 'a4', c: 'c4', sede: 'parque', dias: L.slice(), ti: 840, tf: 1200, modalidad: 'fijo', valor: 950000 },
+      { id: 'a5', c: 'c5', sede: 'parque', dias: L.slice(), ti: 840, tf: 1200, modalidad: 'hora', valor: 6500 },
+      { id: 'a6', c: 'c6', sede: 'norte', dias: L.slice(), ti: 420, tf: 780, modalidad: 'fijo', valor: 950000 },
+      { id: 'a7', c: 'c1', sede: 'parque', dias: [3, 5], ti: 900, tf: 1080, modalidad: 'hora', valor: 6500 },
+      { id: 'a8', c: 'c7', sede: 'centro', dias: [1, 2, 3, 4, 7], ti: 1320, tf: 1800, modalidad: 'fijo', valor: 950000 },
+      { id: 'a9', c: 'c8', sede: 'centro', dias: [6, 7], ti: 480, tf: 840, modalidad: 'hora', valor: 6500 }
+    ],
+    franjas: [
+      { id: 'f1', sede: 'centro', dias: SEMANA.slice(), ti: 480, tf: 840, dot: 2 },
+      { id: 'f2', sede: 'centro', dias: SEMANA.slice(), ti: 840, tf: 1080, dot: 1 },
+      { id: 'f6', sede: 'centro', dias: SEMANA.slice(), ti: 1320, tf: 1800, dot: 1 },
+      { id: 'f3', sede: 'norte', dias: L.slice(), ti: 420, tf: 780, dot: 2 },
+      { id: 'f4', sede: 'parque', dias: L.slice(), ti: 840, tf: 1200, dot: 2 },
+      { id: 'f5', sede: 'parque', dias: [3, 5], ti: 900, tf: 1080, dot: 1 }
+    ],
+    licencias: [
+      { id: 'l1', c: 'c1', tipo: 'licencia', desde: '2026-11-18', hasta: '2026-11-18' },
+      { id: 'l2', c: 'c3', tipo: 'vacaciones', desde: '2026-11-30', hasta: '2026-12-04' },
+      { id: 'l3', c: 'c4', tipo: 'licencia', desde: '2026-12-03', hasta: '2026-12-03' },
+      { id: 'l4', c: 'c1', tipo: 'vacaciones', desde: '2026-12-14', hasta: '2026-12-23' }
+    ],
+    feriados: CALENDARIO.map(x => ({ f: x.f, nombre: x.nombre, tipo: x.tipo, nota: x.nota || '' })),
+    jornadas: [], novedades: [], bitacora: [], avisos: [],
+    ui: { colab: 'c1', tab: 'hoy', cierre: null, recien: null, drafts: {}, casos: {}, detalle: null, descargo: null, festejo: null, errores: {}, admin: 'cronograma', sedeGrilla: 'centro', semana: lunesDe(INICIO) }
+  };
+  for (const a of S.asigs) { a.activa = true; a.desde = null; a.hasta = null; }
+  let f = '2026-11-01';
+  while (f < S.hoy) {
+    for (const a of S.asigs) if (trabajaEl(a, f)) S.jornadas.push(historica(S, a, f));
+    f = sumarDias(f, 1);
+  }
+  for (const a of S.asigs) {
+    if (!trabajaEl(a, S.hoy)) continue;
+    const j = nuevaJornada(S, a, S.hoy, GUION_HOY[a.id] || null);
+    if (a.id === 'a1') { j.entrada = 482; j.metodoIn = 'qr'; j.manual = true; j.tocada = true; }
+    S.jornadas.push(j);
+  }
+  tomarControl(S, 'c1');
+  tick(S);
+  S.novedades = [
+    { id: 'n1', c: 'c3', sede: 'centro', tipo: 'infra', crit: 'alta', texto: 'Pérdida de agua en el baño del segundo piso. Dejé el sector señalizado.', foto: '', f: '2026-11-27', m: 580, estado: 'en_curso' },
+    { id: 'n2', c: 'c2', sede: 'norte', tipo: 'insumos', crit: 'media', texto: 'Quedan dos bidones de lavandina y faltan bolsas de residuos de 80 litros.', foto: '', f: '2026-11-26', m: 675, estado: 'abierta' },
+    { id: 'n3', c: 'c4', sede: 'parque', tipo: 'equipo', crit: 'media', texto: 'La aspiradora industrial no enciende. Probé con otro enchufe.', foto: '', f: '2026-11-25', m: 965, estado: 'abierta' },
+    { id: 'n4', c: 'c1', sede: 'centro', tipo: 'otra', crit: 'baja', texto: 'Pido un carro adicional para el tercer piso.', foto: '', f: '2026-11-19', m: 750, estado: 'resuelta' }
+  ];
+  const jm = S.jornadas.find(j => j.a === 'a1' && j.f === '2026-11-26');
+  if (jm) S.bitacora.push({ id: 'b0', f: '2026-11-27', m: 500, tipo: 'rev', j: jm.id, texto: textoResolucion(S, jm) });
+  return S;
+}
+
+'use strict';
+
+/* Vistas y eventos. Usa las reglas y acciones de logica.js. */
+
+let S = null;
+let avisoT = null;
+const RUTAS = ['colaborador', 'supervisor', 'administracion'];
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const ARS = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+const NOMBRE_ESTADO = { verde: 'Verde', amarillo: 'Amarillo', rojo: 'Rojo', estrella: 'Estrella', revision: 'En revisión', justificada: 'Justificada', programada: 'Sin empezar', en_curso: 'En curso' };
+const ESTRELLA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2l3 6.3 6.9 1-5 4.8 1.2 6.9L12 17.9l-6.1 3.3 1.2-6.9-5-4.8 6.9-1z"/></svg>';
+const ICONOS = {
+  hoy: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+  jornadas: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="2.5" width="8" height="19" rx="4"/><circle cx="12" cy="7" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="17" r="1.2"/></svg>',
+  novedades: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 15.5H3z"/><path d="M12 10v4.5M12 17.3v.2"/></svg>',
+  capacitacion: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9L12 16.9l-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"/></svg>'
+};
+const FESTEJOS = [
+  ['Excelente, {n}', 'Terminamos otra jornada juntos. Que tengas un feliz descanso :)'],
+  ['Muy bien, {n}', 'Jornada completa y a horario. A descansar, que mañana seguimos.'],
+  ['Gracias, {n}', 'Otro día bien hecho. Nos vemos en el próximo turno.'],
+  ['Listo, {n}', 'Hoy salió todo en orden. Que disfrutes tu descanso.']
+];
+const METODO = { qr: 'QR y ubicación', supervisor: 'asistida por supervisor', auto: 'cierre automático' };
+const LETRA_DIA = { 1: 'L', 2: 'M', 3: 'M', 4: 'J', 5: 'V', 6: 'S', 7: 'D' };
+const LIC_CORTA = { vacaciones: 'Vacac.', licencia: 'Licencia', franco: 'Franco' };
+const nb = t => String(t).replace(/ /g, '&nbsp;');
+const ADMIN_TABS = [['cronograma', 'Cronograma'], ['personal', 'Personal y asignaciones'], ['licencias', 'Licencias y vacaciones'], ['feriados', 'Feriados'], ['reglas', 'Reglas'], ['preliquidacion', 'Preliquidación']];
+
+/* ---------- Estado en el navegador ---------- */
+
+function guardar() {
+  try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento, la demo sigue en memoria */ }
+}
+function valido(o) {
+  return !!(o && o.v === VERSION && o.ui && ['jornadas', 'asigs', 'franjas', 'licencias', 'feriados', 'avisos'].every(k => Array.isArray(o[k])));
+}
+function cargar() {
+  try {
+    const t = localStorage.getItem(CLAVE);
+    if (!t) return null;
+    const o = JSON.parse(t);
+    return valido(o) ? o : null;
+  } catch (e) { return null; }
+}
+function aviso(t) {
+  const el = $('#aviso');
+  el.textContent = t;
+  el.classList.add('visible');
+  clearTimeout(avisoT);
+  avisoT = setTimeout(() => el.classList.remove('visible'), 5000);
+}
+function ruta() {
+  const h = location.hash.replace('#', '');
+  return RUTAS.indexOf(h) >= 0 ? h : 'colaborador';
+}
+
+/* ---------- Piezas compartidas ---------- */
+
+function luz(estado) {
+  const n = NOMBRE_ESTADO[estado] || '';
+  if (estado === 'estrella') return '<span class="luz luz-estrella" role="img" aria-label="' + n + '">' + ESTRELLA + '</span>';
+  return '<span class="luz luz-' + estado + '" role="img" aria-label="' + n + '"></span>';
+}
+function chip(estado, numero) {
+  return '<span class="chip-luz">' + luz(estado) + (numero == null ? '' : '<b>' + numero + '</b>') + '</span>';
+}
+function qrSvg() {
+  let s = 7, h = '';
+  const azar = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  const enMarca = (x, y) => (x < 8 && y < 8) || (x > 12 && y < 8) || (x < 8 && y > 12);
+  for (let y = 0; y < 21; y++) for (let x = 0; x < 21; x++) if (!enMarca(x, y) && azar() < 0.46) h += '<rect x="' + x + '" y="' + y + '" width="1" height="1"/>';
+  const marca = (x, y) => '<rect x="' + x + '" y="' + y + '" width="7" height="7"/><rect class="hueco" x="' + (x + 1) + '" y="' + (y + 1) + '" width="5" height="5"/><rect x="' + (x + 2) + '" y="' + (y + 2) + '" width="3" height="3"/>';
+  return '<svg class="qr" viewBox="-2 -2 25 25" aria-hidden="true">' + h + marca(0, 0) + marca(14, 0) + marca(0, 14) + '</svg>';
+}
+function declTexto(j) {
+  const d = j.decl;
+  if (!d) return 'Todavía no declaró.';
+  if (d.tipo === 'extra') return 'Se quedó trabajando.' + (d.texto ? ' ' + d.texto : '');
+  if (d.tipo === 'olvido') return 'Se olvidó de marcar la salida. Dice que terminó a las ' + hm(d.hora) + '.';
+  return 'Dice que sus horas fueron otras. ' + (d.texto || '');
+}
+function corto(c) { return c ? c.nombre + (c.apellido ? ' ' + c.apellido.charAt(0) + '.' : '') : ''; }
+function rango(desde, hasta) {
+  if (desde === hasta) return 'el ' + fechaMedia(desde);
+  if (mesDe(desde) === mesDe(hasta)) return 'del ' + fechaObj(desde).getUTCDate() + ' al ' + fechaMedia(hasta);
+  return 'del ' + fechaMedia(desde) + ' al ' + fechaMedia(hasta);
+}
+function modTexto(m) { return m === 'hora' ? 'Por hora' : 'Fijo'; }
+function sedesOp(sel, lista) {
+  return (lista || S.sedes).map(s => '<option value="' + s.id + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.nombre) + '</option>').join('');
+}
+function modOp(sel) {
+  return '<option value="fijo"' + (sel === 'fijo' ? ' selected' : '') + '>Fijo</option><option value="hora"' + (sel === 'hora' ? ' selected' : '') + '>Por hora</option>';
+}
+/* Siete casillas de lunes a domingo. `datos` son los atributos que identifican qué se edita. */
+function diasHtml(idBase, datos, dias) {
+  return '<span class="dias">' + SEMANA.map(d =>
+    '<label title="' + cap(DIA_ISO[d]) + '"><input type="checkbox" id="' + idBase + '-' + d + '" ' + datos + ' data-dia="' + d + '"' + (dias.indexOf(d) >= 0 ? ' checked' : '') + ' aria-label="' + cap(DIA_ISO[d]) + '"><span>' + LETRA_DIA[d] + '</span></label>').join('') + '</span>';
+}
+function borradorDias(clave, base) { const v = S.ui.drafts[clave]; return Array.isArray(v) ? v : base.slice(); }
+function pillFeriado(f) {
+  const x = feriadoEl(S, f);
+  return x ? '<span class="pill fer" title="' + esc(x.nombre) + '">' + (x.tipo === 'feriado' ? 'Feriado' : 'No laborable') + '</span>' : '';
+}
+
+/* ---------- Colaborador ---------- */
+
+function vistaColab() {
+  const c = colabSel(S);
+  if (!c) return '<div class="pagina"><p class="vacio">No hay colaboradores con asignaciones activas. Agregá una desde Administración.</p></div>';
+  const tabs = [['hoy', 'Hoy'], ['jornadas', 'Mis jornadas'], ['novedades', 'Novedades'], ['capacitacion', 'Capacitación']];
+  const cuerpo = S.ui.tab === 'jornadas' ? jornadasHtml(c) : S.ui.tab === 'novedades' ? novedadesColabHtml(c) : S.ui.tab === 'capacitacion' ? capacitacionHtml(c) : hoyHtml(c);
+  return '<div class="demo-colab">' +
+    '<div class="telefono">' +
+      '<div class="cabecera-app"><p class="fecha-app">' + cap(fechaLarga(S.hoy)) + ', ' + hm(S.ahora) + '</p><h1>Hola, ' + esc(c.nombre) + '</h1></div>' +
+      '<div class="pantalla" id="pantalla">' + cuerpo + '</div>' +
+      '<nav class="tabs" aria-label="Secciones de la aplicación">' +
+        tabs.map(t => '<button type="button" data-a="tab" data-tab="' + t[0] + '" id="tab-' + t[0] + '"' + (S.ui.tab === t[0] ? ' aria-current="true"' : '') + '>' + ICONOS[t[0]] + '<span>' + t[1] + '</span></button>').join('') +
+      '</nav>' +
+    '</div>' +
+    '<aside class="guia">' + guiaHtml(c) + '</aside>' +
+  '</div>';
+}
+
+function hoyHtml(c) {
+  const ts = tramosHoy(S, c.id);
+  const pend = pendienteDeclarar(S, c.id);
+  const fer = feriadoEl(S, S.hoy);
+  let h = pend ? olvidoHtml(pend) : '';
+  if (fer && ts.some(j => !j.justif)) h += '<p class="nota info">Hoy es ' + (fer.tipo === 'feriado' ? 'feriado' : 'día no laborable') + ': ' + esc(fer.nombre) + '. Tu turno se registra igual y la liquidación lo distingue.</p>';
+  if (!ts.length) return h + '<p class="nota info">Hoy no tenés turnos asignados. Tus jornadas anteriores están en Mis jornadas.</p>' + ausenciaHtml(c);
+  const rec = S.ui.recien ? ts.find(j => j.id === S.ui.recien && j.cerrada && !j.justif) : null;
+  if (rec) return h + cerradaHtml(c, rec, ev(S, rec));
+  const act = tramoActual(S, c.id);
+  const lista = ts.length > 1 ? turnosHoyHtml(ts, act) : '';
+  if (!act) {
+    const ult = ultimoCerrado(S, c.id);
+    if (ult) return h + cerradaHtml(c, ult, ev(S, ult)) + lista;
+    return h + '<p class="nota info">Hoy figura como ' + esc(ev(S, ts[0]).detalle.toLowerCase()) + '. No hace falta fichar.</p>';
+  }
+  if (act.entrada == null) return h + lista + sinEntradaHtml(act, ev(S, act)) + ausenciaHtml(c);
+  if (S.ui.cierre) return h + formCierreHtml(act);
+  return h + lista + enCursoHtml(act, ev(S, act)) + ausenciaHtml(c);
+}
+
+function turnosHoyHtml(ts, act) {
+  return '<ul class="turnos-hoy" aria-label="Tus turnos de hoy">' + ts.map(j => {
+    const e = ev(S, j);
+    return '<li' + (act && act.id === j.id ? ' aria-current="true"' : '') + '>' + chip(e.estado) + '<div><p class="dia">' + esc(sedeNombre(S, j.sede)) + '</p><p class="horas-t">' + hm(j.ti) + ' a ' + hm(j.tf) + (j.f !== S.hoy ? ', desde ayer' : '') + '. ' + esc(e.detalle) + '</p></div></li>';
+  }).join('') + '</ul>';
+}
+
+function ausenciaHtml(c) {
+  const l = proximaLicencia(S, c.id);
+  if (!l || l.desde <= S.hoy || l.desde > sumarDias(S.hoy, 45)) return '';
+  const que = l.tipo === 'vacaciones' ? 'vacaciones' : l.tipo === 'franco' ? 'un franco' : 'una licencia';
+  return '<p class="ayuda">Tenés ' + que + ' ' + rango(l.desde, l.hasta) + '.</p>';
+}
+
+function olvidoHtml(j) {
+  return '<form class="nota info form-nota" data-form="olvido" data-j="' + j.id + '" novalidate>' +
+    '<p><strong>El ' + fechaLarga(j.f) + ' no marcaste la salida en ' + esc(sedeNombre(S, j.sede)) + '.</strong> ¿A qué hora terminaste?</p>' +
+    '<div class="fila-form"><label class="oculto" for="olvido-hora">Hora en que terminaste</label>' +
+    '<input type="time" id="olvido-hora" value="' + hm(j.tf) + '">' +
+    '<button class="btn chico primario" type="submit" id="btn-olvido">Avisar a mi supervisor</button></div>' +
+    '<p class="error" role="alert">' + esc(S.ui.errores.olvido || '') + '</p>' +
+  '</form>';
+}
+
+function sinEntradaHtml(j, e) {
+  let n = '';
+  if (e.enVivo) n = '<p class="nota ' + (e.estado === 'rojo' ? 'falta' : 'obs') + '">Tu turno empezó a las ' + hm(j.ti) + '. Marcá la entrada apenas llegues.</p>';
+  return '<section class="bloque">' +
+    '<div><p class="sede">' + esc(sedeNombre(S, j.sede)) + '</p><p class="turno-txt">Tu turno es de ' + hm(j.ti) + ' a ' + hm(j.tf) + '.</p></div>' + n +
+    '<div class="qr-caja">' + qrSvg() + '<p>QR de ' + esc(sedeNombre(S, j.sede)) + '</p></div>' +
+    '<button class="btn primario ancho" type="button" data-a="entrada" id="btn-entrada">Marcar entrada</button>' +
+    '<p class="ayuda">En la versión real, este paso lee el QR de la sede y verifica tu ubicación. En esta demo está simulado.</p>' +
+  '</section>';
+}
+
+function notaEntrada(j, e) {
+  if (j.metodoIn === 'supervisor') return '<p class="nota info">Tu supervisor registró tu entrada a las ' + hm(j.entrada) + '.</p>';
+  if (e.demora > S.P.rojo) return '<p class="nota falta">Entrada con ' + dur(e.demora) + ' de demora: el turno queda en rojo. Si pasó algo, contalo desde Mis jornadas.</p>';
+  if (e.demora > S.P.gracia) return '<p class="nota obs">Entrada con ' + dur(e.demora) + ' de demora: el turno queda en amarillo.</p>';
+  return '<p class="nota ok">Llegaste a horario. Buen comienzo.</p>';
+}
+
+function enCursoHtml(j, e) {
+  const rel = relDe(S, j);
+  return '<section class="bloque">' +
+    '<div><p class="sede">' + esc(sedeNombre(S, j.sede)) + '</p><p class="turno-txt">Llevás ' + dur(Math.max(0, rel - j.entrada)) + ' de jornada.</p></div>' +
+    '<div class="tiempos"><div class="tiempo"><span>Entrada</span><strong>' + hm(j.entrada) + '</strong></div><div class="tiempo"><span>Tu turno termina</span><strong>' + hm(j.tf) + '</strong></div></div>' +
+    notaEntrada(j, e) +
+    (rel > j.tf ? '<p class="nota info">Tu turno terminó a las ' + hm(j.tf) + '. Cuando termines, cerrá la jornada.</p>' : '') +
+    '<button class="btn primario ancho" type="button" data-a="abrir-cierre" id="btn-abrir-cierre">Cerrar jornada</button>' +
+  '</section>';
+}
+
+function formCierreHtml(j) {
+  const k = S.ui.cierre, d = S.ui.drafts;
+  const exc = relDe(S, j) - j.tf;
+  let medio;
+  if (exc > S.P.margen) {
+    medio = '<fieldset class="campo"><legend>Registramos ' + dur(exc) + ' de más. ¿Qué pasó?</legend>' +
+      '<label class="opcion"><input type="radio" name="que" id="que-extra" value="extra"' + (k.que === 'extra' ? ' checked' : '') + '><span>Me quedé trabajando</span></label>' +
+      '<label class="opcion"><input type="radio" name="que" id="que-olvido" value="olvido"' + (k.que === 'olvido' ? ' checked' : '') + '><span>Me olvidé de marcar la salida</span></label></fieldset>';
+    if (k.que === 'extra') medio += '<label class="campo" for="cierre-texto">¿En qué te quedaste?<textarea id="cierre-texto" data-draft="cierreTexto" rows="2" maxlength="200">' + esc(d.cierreTexto || '') + '</textarea></label>';
+    if (k.que === 'olvido') medio += '<label class="campo" for="cierre-hora">¿A qué hora terminaste?<input type="time" id="cierre-hora" data-draft="cierreHora" value="' + esc(d.cierreHora || hm(j.tf)) + '"></label>';
+  } else {
+    medio = '<label class="opcion"><input type="checkbox" id="cierre-ok"' + (k.ok ? ' checked' : '') + (k.otras ? ' disabled' : '') + '><span>Confirmo que trabajé de ' + hm(j.entrada) + ' a ' + hm(S.ahora) + '</span></label>' +
+      '<button type="button" class="enlace" data-a="otras-horas" id="btn-otras">' + (k.otras ? 'Mis horas coinciden' : 'Mis horas fueron otras') + '</button>';
+    if (k.otras) medio += '<label class="campo" for="cierre-texto">Contanos qué fue distinto<textarea id="cierre-texto" data-draft="cierreTexto" rows="2" maxlength="200">' + esc(d.cierreTexto || '') + '</textarea></label>';
+  }
+  return '<form class="bloque" data-form="cierre" novalidate>' +
+    '<div><p class="sede">Cierre de jornada</p><p class="turno-txt">' + esc(sedeNombre(S, j.sede)) + '</p></div>' +
+    '<div class="tiempos"><div class="tiempo"><span>Entrada</span><strong>' + hm(j.entrada) + '</strong></div><div class="tiempo"><span>Salida</span><strong>' + hm(S.ahora) + '</strong></div></div>' +
+    medio +
+    '<p class="error" role="alert">' + esc(k.error || '') + '</p>' +
+    '<button class="btn primario ancho" type="submit" id="btn-cerrar">Cerrar jornada</button>' +
+    '<button class="btn ancho" type="button" data-a="cancelar-cierre" id="btn-cancelar-cierre">Volver</button>' +
+  '</form>';
+}
+
+function cerradaHtml(c, j, e) {
+  const n = esc(c.nombre), sede = sedeNombre(S, j.sede);
+  const prox = tramosHoy(S, c.id).filter(t => !t.cerrada && !t.justif)[0] || null;
+  let titulo, msj;
+  if (j.metodoOut === 'supervisor') {
+    titulo = 'Jornada cerrada, ' + n;
+    msj = 'Tu supervisor registró la salida a las ' + hm(j.salida) + '.';
+  } else if (prox) {
+    if (e.estado === 'verde' || e.estado === 'estrella') { titulo = 'Muy bien, ' + n; msj = 'Turno en ' + sede + ' cerrado y a horario.'; }
+    else if (e.estado === 'revision') { titulo = 'Gracias, ' + n; msj = 'Tu supervisor va a revisar el tiempo de este turno.'; }
+    else if (e.estado === 'amarillo') { titulo = 'Turno cerrado, ' + n; msj = 'Gracias por marcar la salida. Quedó una observación en este turno.'; }
+    else { titulo = 'Turno cerrado, ' + n; msj = 'Gracias por marcar la salida. Si pasó algo con la llegada, contalo desde Mis jornadas.'; }
+  } else if (e.estado === 'verde' || e.estado === 'estrella') {
+    const f = FESTEJOS[((diasEntre(INICIO, j.f) % FESTEJOS.length) + FESTEJOS.length) % FESTEJOS.length];
+    titulo = f[0].replace('{n}', n);
+    msj = f[1];
+  } else if (e.estado === 'revision') {
+    titulo = 'Gracias, ' + n;
+    msj = 'Tu supervisor va a revisar el tiempo de hoy. Que tengas un buen descanso.';
+  } else if (e.estado === 'amarillo') {
+    titulo = 'Jornada cerrada, ' + n;
+    msj = 'Gracias por marcar la salida. Hoy quedó una observación y mañana arrancamos de nuevo.';
+  } else {
+    titulo = 'Jornada cerrada, ' + n;
+    msj = 'Gracias por marcar la salida. Si hoy pasó algo con la llegada, contalo desde Mis jornadas.';
+  }
+  if (prox) msj += ' Tu próximo turno de hoy empieza a las ' + hm(prox.ti) + ' en ' + sedeNombre(S, prox.sede) + '.';
+  const pos = e.estado === 'rojo' ? 0 : e.estado === 'amarillo' ? 1 : 2;
+  const focos = [0, 1, 2].map(i => {
+    if (i !== pos) return '<span class="foco"></span>';
+    if (e.estado === 'estrella') return '<span class="foco on con-estrella">' + ESTRELLA + '</span>';
+    if (e.estado === 'revision') return '<span class="foco on en-revision"></span>';
+    return '<span class="foco on ' + (i === 0 ? 'rojo' : i === 1 ? 'ambar' : 'verde') + '"></span>';
+  }).join('');
+  let lineaRacha = '';
+  if (!prox) {
+    const r = racha(S, c.id);
+    lineaRacha = r >= 2 ? '<p class="racha">Llevás ' + r + ' jornadas seguidas sin observaciones.</p>' : r === 1 ? '<p class="racha">Hoy arranca una racha nueva.</p>' : '';
+  }
+  const botones = prox
+    ? '<button class="btn primario ancho" type="button" data-a="proximo" id="btn-proximo">Ver mi próximo turno</button>'
+    : '<button class="btn ancho" type="button" data-a="tab" data-tab="jornadas" id="btn-ver-jornadas">Ver mis jornadas</button>' +
+      '<button class="btn ancho" type="button" data-a="tab" data-tab="novedades" id="btn-ir-novedades">Cargar una novedad</button>';
+  return '<section class="cierre-ok' + (S.ui.festejo === j.id ? ' festejo' : '') + '">' +
+    '<div class="semaforo-v" aria-hidden="true">' + focos + '</div>' +
+    '<h2>' + titulo + '</h2>' +
+    '<p class="mensaje">' + esc(msj) + '</p>' +
+    '<p class="resultado">' + chip(e.estado) + '<span>' + esc(e.detalle) + ', de ' + hm(j.entrada) + ' a ' + hm(j.salida) + ' en ' + esc(sede) + '</span></p>' +
+    lineaRacha +
+    '<div class="acciones">' + botones + '</div>' +
+  '</section>';
+}
+
+function jornadasHtml(c) {
+  const mes = mesDe(S.hoy);
+  const varias = asigsDe(S, c.id).length > 1;
+  const js = S.jornadas.filter(j => j.c === c.id && mesDe(j.f) === mes).sort((a, b) => -porInicio(a, b));
+  const r = resumenMes(S, c.id, mes), n = racha(S, c.id);
+  const filas = js.map(j => {
+    const e = ev(S, j);
+    let horas = '';
+    if (!j.justif && j.entrada != null) {
+      const sal = j.rev && j.salidaVal != null ? j.salidaVal : j.salida;
+      horas = hm(j.entrada) + ' a ' + (sal == null ? (j.cerrada ? 'sin marcar' : 'en curso') : hm(sal));
+    }
+    let mas = '';
+    if (e.estado === 'rojo' && j.cerrada) {
+      if (j.descargo) mas = '<p class="descargo">Tu aviso: ' + esc(j.descargo) + '</p>';
+      else if (S.ui.descargo === j.id) {
+        mas = '<form class="form-descargo" data-form="descargo" data-j="' + j.id + '" novalidate><label class="oculto" for="descargo-txt">Qué pasó</label>' +
+          '<textarea id="descargo-txt" data-draft="descargo" rows="2" maxlength="280" placeholder="Se demoró el colectivo por un corte">' + esc(S.ui.drafts.descargo || '') + '</textarea>' +
+          '<p class="error" role="alert">' + esc(S.ui.errores.descargo || '') + '</p>' +
+          '<button class="btn chico primario" type="submit" id="btn-descargo">Enviar a mi supervisor</button></form>';
+      } else mas = '<button class="enlace" type="button" data-a="abrir-descargo" data-j="' + j.id + '" id="desc-' + j.id + '">Contar qué pasó</button>';
+    } else if (e.estado === 'revision') {
+      mas = '<p class="descargo">' + (j.salida == null && !j.decl ? 'Avisá desde Hoy a qué hora terminaste.' : 'Tu supervisor define cómo queda.') + '</p>';
+    }
+    return '<li class="fila"><div class="riel">' + luz(e.estado) + '</div><div class="cont"><div class="linea1"><span class="dia">' + cap(fechaCorta(j.f)) + pillFeriado(j.f) + '</span><span class="horas">' + horas + '</span></div>' +
+      (varias ? '<p class="sede-mini">' + esc(sedeNombre(S, j.sede)) + '</p>' : '') + '<p class="det">' + esc(e.detalle) + '</p>' + mas + '</div></li>';
+  }).join('');
+  return '<section class="bloque">' +
+    '<h2 class="titulo-tab">Mis jornadas de ' + nombreMes(S.hoy) + '</h2>' +
+    '<ul class="cuentas">' +
+      '<li>' + chip('verde', r.verde) + '<span>en verde</span></li>' +
+      '<li>' + chip('estrella', r.estrella) + '<span>con estrella</span></li>' +
+      '<li>' + chip('amarillo', r.amarillo) + '<span>en amarillo</span></li>' +
+      '<li>' + chip('rojo', r.rojo) + '<span>en rojo</span></li>' +
+    '</ul>' +
+    (n >= 2 ? '<p class="nota ok">Llevás ' + n + ' jornadas seguidas sin observaciones.</p>' : '') +
+    (varias ? '<p class="ayuda">Trabajás en más de una sede: cada turno tiene su propia luz.</p>' : '') +
+    '<ul class="lista-jornadas">' + filas + '</ul>' +
+  '</section>';
+}
+
+function novedadesColabHtml(c) {
+  const d = S.ui.drafts;
+  const tipo = d.novTipo || 'insumos', crit = d.novCrit || 'media';
+  const mias = S.novedades.filter(n => n.c === c.id);
+  const ids = asigsDe(S, c.id).map(a => a.sede);
+  const misSedes = S.sedes.filter(s => ids.indexOf(s.id) >= 0);
+  const sedeSel = d.novSede && ids.indexOf(d.novSede) >= 0 ? d.novSede : sedeActual(S, c.id);
+  return '<section class="bloque">' +
+    '<h2 class="titulo-tab">Novedades</h2>' +
+    '<form class="bloque" data-form="novedad" novalidate>' +
+      (misSedes.length > 1 ? '<label class="campo" for="nov-sede">¿En qué sede?<select id="nov-sede" data-draft="novSede">' + sedesOp(sedeSel, misSedes) + '</select></label>' : '') +
+      '<label class="campo" for="nov-tipo">¿De qué se trata?<select id="nov-tipo" data-draft="novTipo">' +
+        Object.keys(TIPOS_NOV).map(k => '<option value="' + k + '"' + (k === tipo ? ' selected' : '') + '>' + TIPOS_NOV[k] + '</option>').join('') + '</select></label>' +
+      '<fieldset class="campo"><legend>Urgencia</legend><div class="segmento">' +
+        Object.keys(CRITICIDAD).map(k => '<label><input type="radio" name="nov-crit" id="nov-crit-' + k + '" value="' + k + '" data-draft="novCrit"' + (k === crit ? ' checked' : '') + '><span>' + CRITICIDAD[k] + '</span></label>').join('') + '</div></fieldset>' +
+      '<label class="campo" for="nov-texto">¿Qué pasó?<textarea id="nov-texto" data-draft="novTexto" rows="3" maxlength="400" placeholder="Se rompió el secador de manos del baño de planta baja">' + esc(d.novTexto || '') + '</textarea></label>' +
+      '<label class="campo" for="nov-foto">Foto, si ayuda a entenderlo<input type="file" id="nov-foto" accept="image/*"></label>' +
+      '<p class="error" role="alert">' + esc(S.ui.errores.nov || '') + '</p>' +
+      '<button class="btn primario ancho" type="submit" id="btn-nov">Enviar novedad</button>' +
+    '</form>' +
+    '<h3 class="subtitulo">Mis novedades</h3>' +
+    (mias.length ? '<ul class="lista-nov">' + mias.map(n => '<li><div class="linea1"><span class="dia">' + TIPOS_NOV[n.tipo] + '</span><span class="pill est-' + n.estado + '">' + ESTADOS_NOV[n.estado] + '</span></div><p class="det">' + esc(n.texto) + '</p><p class="descargo">' + esc(sedeNombre(S, n.sede)) + ', ' + fechaCorta(n.f) + ' ' + hm(n.m) + (n.foto ? '. Con foto: ' + esc(n.foto) : '') + '</p></li>').join('') + '</ul>'
+      : '<p class="ayuda">Todavía no cargaste novedades. Cuando veas algo roto o falte un insumo, avisá desde acá.</p>') +
+  '</section>';
+}
+
+function capacitacionHtml(c) {
+  const r = resumenMes(S, c.id, mesDe(S.hoy));
+  const cursos = ['Uso seguro de productos de limpieza', 'Limpieza de áreas críticas', 'Cuidado de máquinas y equipos'];
+  return '<section class="bloque">' +
+    '<h2 class="titulo-tab">Capacitación</h2>' +
+    '<p class="nota info">Este espacio llega en una próxima etapa: cursos cortos desde el teléfono y premios a medida que se completan.</p>' +
+    '<h3 class="subtitulo">Lo que ya suma este mes</h3>' +
+    '<ul class="logros">' +
+      '<li><b>' + racha(S, c.id) + '</b><span>jornadas seguidas sin observaciones</span></li>' +
+      '<li><b>' + r.estrella + '</b><span>estrellas por horas extra verificadas</span></li>' +
+      '<li><b>' + r.cerradasPorColab + ' de ' + r.conEntrada + '</b><span>turnos cerrados por vos</span></li>' +
+    '</ul>' +
+    '<h3 class="subtitulo">Cursos de ejemplo</h3>' +
+    '<ul class="lista-nov">' + cursos.map(t => '<li><div class="linea1"><span class="dia">' + t + '</span><span class="pill">Próximamente</span></div></li>').join('') + '</ul>' +
+  '</section>';
+}
+
+function guiaHtml(c) {
+  const ts = tramosHoy(S, c.id).filter(j => !j.justif);
+  const act = tramoActual(S, c.id) || ultimoCerrado(S, c.id);
+  const a0 = asigsDe(S, c.id).filter(a => a.activa)[0];
+  const corr = act ? 1440 * diasEntre(act.f, S.hoy) : 0;
+  const ti = (act ? act.ti : a0 ? a0.ti : 480) - corr, tf = (act ? act.tf : a0 ? a0.tf : 840) - corr;
+  const boton = (min, id) => min >= S.ahora && min <= 1439 ? '<button class="btn chico" type="button" data-a="hora" data-min="' + min + '" id="' + id + '">Poner ' + hm(min) + '</button>' : '';
+  const sig = ts.find(j => !j.cerrada && j.entrada == null) || null;
+  const sigMin = sig ? sig.ti - 1440 * diasEntre(sig.f, S.hoy) : -1;
+  let dos = '';
+  if (new Set(ts.map(j => j.sede)).size > 1) {
+    dos = '<li><h3>Dos sedes en un día</h3><p>Hoy ' + esc(c.nombre) + ' tiene turnos en ' + Array.from(new Set(ts.map(j => j.sede))).map(id => esc(sedeNombre(S, id))).join(' y ') + '. Cerrá el primero' + (sig ? ', llevá el reloj a las ' + hm(sig.ti) : '') + ' y marcá la entrada en la otra sede. Cada turno tiene su propia luz.</p>' + (sig ? boton(sigMin, 'pr-sede') : '') + '</li>';
+  }
+  const noct = S.asigs.find(a => a.activa && a.tf > 1440);
+  const noche = noct ? '<li><h3>Turno de noche</h3><p>' + esc(colab(S, noct.c).nombre) + ' trabaja de ' + hm(noct.ti) + ' a ' + hm(noct.tf) + ', ' + listaDias(noct.dias) + '. Elegí su teléfono un día que le toque, marcá la entrada y pasá al día siguiente: el turno sigue abierto y se cierra a la mañana.</p></li>' : '';
+  return '<h2>Probá el recorrido del colaborador</h2>' +
+    '<label class="campo campo-linea" for="sel-colab">Este teléfono es de<select id="sel-colab">' +
+      activos(S).map(x => {
+        const as = asigsDe(S, x.id).filter(a => a.activa);
+        return '<option value="' + x.id + '"' + (x.id === c.id ? ' selected' : '') + '>' + esc(nombreCompleto(x)) + ', ' + (as.length > 1 ? as.length + ' sedes' : hm(as[0].ti) + ' a ' + hm(as[0].tf)) + '</option>';
+      }).join('') + '</select></label>' +
+    '<ul class="pruebas">' +
+      '<li><h3>Cerrar a horario</h3><p>Con el reloj cerca de las ' + hm(tf) + ', tocá Cerrar jornada y confirmá tus horas.</p></li>' +
+      dos +
+      '<li><h3>Quedarse de más</h3><p>Llevá el reloj a las ' + hm(tf + 80) + ' y cerrá. El turno pasa a control excedente y aparece en Supervisor.</p>' + boton(tf + 80, 'pr-extra') + '</li>' +
+      '<li><h3>Olvidar la salida</h3><p>Sin cerrar, pasá al día siguiente. El sistema cierra solo y la app pregunta a qué hora terminaste.</p></li>' +
+      '<li><h3>Llegar tarde</h3><p>En un día nuevo, poné las ' + hm(ti + 12) + ' antes de marcar la entrada y queda en amarillo. Con más de ' + S.P.rojo + ' minutos, en rojo.</p>' + boton(ti + 12, 'pr-tarde') + '</li>' +
+      noche +
+    '</ul>' +
+    '<p class="ayuda">El QR y la ubicación están simulados. Los datos son de ejemplo y se guardan solo en este navegador. El resto del equipo ficha solo a medida que avanza el reloj.</p>';
+}
+
+/* ---------- Supervisor ---------- */
+
+function casoHtml(j) {
+  const c = colab(S, j.c), a = asig(S, j.a), k = S.ui.casos[j.id] || {};
+  const sinSalida = j.salida == null;
+  const hayExc = sinSalida || j.salida - j.tf > S.P.margen;
+  const ops = hayExc ? [['extra', 'Fue hora extra'], ['olvido', 'Olvidó marcar la salida']] : [['ajuste', 'Corregir la salida'], ['ok', 'Mantener el registro']];
+  let que = k.que;
+  if (!ops.some(o => o[0] === que)) que = hayExc ? (sinSalida || (j.decl && j.decl.tipo === 'olvido') ? 'olvido' : 'extra') : 'ajuste';
+  let hora = k.hora;
+  if (hora == null) {
+    const dicha = j.decl && j.decl.hora != null ? j.decl.hora : null;
+    if (que === 'extra') hora = sinSalida ? (dicha != null && dicha > j.tf ? dicha : j.tf + 60) : j.salida;
+    else if (que === 'olvido') hora = dicha != null ? dicha : j.tf;
+    else hora = j.salida;
+  }
+  const min = minutosDelDia(S, j.c, j.f), tope = topeDelDia(S, j.c, j.f);
+  return '<li class="caso">' +
+    '<div class="caso-quien"><p class="nombre">' + esc(nombreCompleto(c)) + '</p><p class="sub">' + cap(fechaLarga(j.f)) + '<br>' + esc(sedeNombre(S, j.sede)) + '</p><p><span class="pill">' + modTexto(a ? a.modalidad : 'fijo') + '</span>' + pillFeriado(j.f) + '</p></div>' +
+    '<dl class="caso-datos">' +
+      '<div><dt>Turno asignado</dt><dd>' + hm(j.ti) + ' a ' + hm(j.tf) + '</dd></div>' +
+      '<div><dt>Entrada</dt><dd>' + hm(j.entrada) + '</dd></div>' +
+      '<div><dt>Salida registrada</dt><dd>' + (sinSalida ? 'Sin marcar' : hm(j.salida)) + '</dd></div>' +
+      '<div><dt>Tiempo de más</dt><dd>' + (sinSalida ? 'Sin dato, cierre automático' : j.salida > j.tf ? dur(j.salida - j.tf) : 'Ninguno') + '</dd></div>' +
+      '<div class="ancho"><dt>Dice el colaborador</dt><dd>' + esc(declTexto(j)) + '</dd></div>' +
+      (min > tope * 60 ? '<div class="ancho"><dt>Tope diario</dt><dd>Con este registro suma ' + dur(min) + ' ese día, por encima del tope de ' + tope + ' h.</dd></div>' : '') +
+    '</dl>' +
+    '<form class="caso-form" data-form="resolver" data-j="' + j.id + '" novalidate>' +
+      '<fieldset><legend>Qué pasó</legend>' +
+        ops.map(o => '<label class="radio"><input type="radio" name="que-' + j.id + '" id="que-' + j.id + '-' + o[0] + '" value="' + o[0] + '" data-caso="' + j.id + '" data-campo="que"' + (o[0] === que ? ' checked' : '') + '><span>' + o[1] + '</span></label>').join('') +
+      '</fieldset>' +
+      '<label class="linea" for="val-' + j.id + '">Salida validada<input type="time" id="val-' + j.id + '" data-caso="' + j.id + '" data-campo="hora" value="' + hm(hora) + '"' + (que === 'ok' ? ' disabled' : '') + '></label>' +
+      '<p class="error" role="alert">' + esc(k.error || '') + '</p>' +
+      '<button class="btn chico primario" type="submit" id="res-' + j.id + '">Resolver</button>' +
+    '</form>' +
+  '</li>';
+}
+
+function detalleHtml(j) {
+  const c = colab(S, j.c), e = ev(S, j), p = [], fer = feriadoEl(S, j.f);
+  p.push('<strong>' + esc(nombreCompleto(c)) + ', ' + fechaLarga(j.f) + '.</strong> ' + esc(e.detalle) + '.');
+  if (!j.justif) {
+    p.push('Turno de ' + hm(j.ti) + ' a ' + hm(j.tf) + ' en ' + esc(sedeNombre(S, j.sede)) + '.');
+    if (fer) p.push((fer.tipo === 'feriado' ? 'Feriado: ' : 'Día no laborable: ') + esc(fer.nombre) + '.');
+    if (j.entrada != null) p.push('Entrada ' + hm(j.entrada) + ' (' + (METODO[j.metodoIn] || METODO.qr) + ').');
+    if (j.cerrada && j.entrada != null) p.push(j.salida == null ? 'Salida sin marcar (cierre automático).' : 'Salida ' + hm(j.salida) + ' (' + (METODO[j.metodoOut] || METODO.qr) + ').');
+    if (j.rev && j.salidaVal != null && j.salidaVal !== j.salida) p.push('Salida validada por supervisión: ' + hm(j.salidaVal) + '.');
+    if (j.decl) p.push('Declaración: ' + esc(declTexto(j)));
+    if (j.descargo) p.push('Aviso del colaborador: ' + esc(j.descargo));
+  }
+  return '<p class="detalle" id="detalle-jornada">' + p.join(' ') + '</p>';
+}
+
+function tableroHtml() {
+  const mes = mesDe(S.hoy);
+  const delMes = S.jornadas.filter(j => mesDe(j.f) === mes);
+  const dias = Array.from(new Set(delMes.map(j => j.f))).sort();
+  const n = dias.length;
+  let h = '<div class="tablero-wrap"><div class="tablero" style="grid-template-columns:max-content repeat(' + n + ',30px)"><div></div>' +
+    dias.map(f => {
+      const fer = feriadoEl(S, f);
+      return '<div class="t-dia' + (fer ? ' fer' : '') + '" title="' + cap(fechaLarga(f)) + (fer ? ', ' + esc(fer.nombre) : '') + '"><span>' + LETRA_DIA[dIso(f)] + '</span>' + fechaObj(f).getUTCDate() + '</div>';
+    }).join('');
+  for (const c of S.colabs) {
+    for (const a of asigsDe(S, c.id)) {
+      const mapa = {};
+      for (const j of delMes) if (j.a === a.id) mapa[j.f] = j;
+      if (!Object.keys(mapa).length) continue;
+      h += '<div class="t-nombre">' + esc(nombreCompleto(c)) + '<span>' + esc(sedeNombre(S, a.sede)) + ', ' + hm(a.ti) + ' a ' + hm(a.tf) + '</span></div>' + dias.map((f, i) => {
+        const j = mapa[f], cls = 't-celda' + (i === 0 ? ' pri' : '') + (i === n - 1 ? ' ult' : '');
+        if (!j) return '<div class="' + cls + '"></div>';
+        const e = ev(S, j);
+        return '<div class="' + cls + '"><button type="button" class="t-luz" data-a="detalle" data-j="' + j.id + '" id="tl-' + j.id + '" aria-pressed="' + (S.ui.detalle === j.id) + '" aria-label="' + esc(nombreCompleto(c) + ', ' + sedeNombre(S, a.sede) + ', ' + fechaLarga(f) + ': ' + e.detalle) + '">' + luz(e.estado) + '</button></div>';
+      }).join('');
+    }
+  }
+  h += '</div></div>';
+  h += '<ul class="leyenda">' +
+    '<li>' + chip('verde') + 'Correcto</li><li>' + chip('estrella') + 'Hora extra verificada</li><li>' + chip('amarillo') + 'Con observación</li>' +
+    '<li>' + chip('rojo') + 'Inasistencia o demora mayor a ' + S.P.rojo + ' min</li><li>' + chip('revision') + 'En revisión</li><li>' + chip('justificada') + 'Justificada</li><li>' + chip('en_curso') + 'En curso</li>' +
+    '<li><span class="t-dia fer muestra">F</span>Feriado o día no laborable</li></ul>';
+  const jd = S.ui.detalle ? porId(S, S.ui.detalle) : null;
+  h += jd ? detalleHtml(jd) : '<p class="detalle" id="detalle-jornada">Tocá una luz para ver el detalle de ese turno.</p>';
+  return h;
+}
+
+function vistaSupervisor() {
+  const mes = mesDe(S.hoy);
+  const orden = {};
+  S.colabs.forEach((c, i) => { orden[c.id] = i; });
+  const hoyJs = tramosDelDia(S).sort((a, b) => orden[a.c] - orden[b.c] || porInicio(a, b));
+  const pend = pendientes(S);
+  const enCurso = hoyJs.filter(j => ev(S, j).estado === 'en_curso').length;
+  const sinIng = hoyJs.filter(j => ev(S, j).enVivo).length;
+  const novAb = S.novedades.filter(n => n.estado !== 'resuelta').length;
+  const inas = S.jornadas.filter(j => mesDe(j.f) === mes && j.cerrada && j.entrada == null && !j.justif).sort((a, b) => -porInicio(a, b)).slice(0, 8);
+  const fer = feriadoEl(S, S.hoy);
+
+  const equipo = hoyJs.map(j => {
+    const c = colab(S, j.c), e = ev(S, j);
+    let accion = '';
+    if (!j.cerrada && !j.justif) accion = '<button class="btn chico" type="button" data-a="asistido" data-j="' + j.id + '" id="asis-' + j.id + '">' + (j.entrada == null ? 'Fichar entrada' : 'Fichar salida') + '</button>';
+    return '<tr><td><span class="nombre">' + esc(nombreCompleto(c)) + '</span></td><td>' + esc(sedeNombre(S, j.sede)) + '</td><td>' + hm(j.ti) + ' a ' + hm(j.tf) + (j.f !== S.hoy ? ', desde ayer' : '') + '</td>' +
+      '<td>' + (j.justif ? 'No ficha' : j.entrada == null ? 'Pendiente' : hm(j.entrada) + (j.metodoIn === 'supervisor' ? ', asistida' : '')) + '</td>' +
+      '<td>' + (j.justif ? 'No ficha' : j.salida == null ? (j.cerrada && j.entrada != null ? 'Sin marcar' : 'Pendiente') : hm(j.salida) + (j.metodoOut === 'supervisor' ? ', asistida' : '')) + '</td>' +
+      '<td><span class="estado-celda">' + chip(e.estado) + '<span>' + esc(e.detalle) + '</span></span></td><td class="num">' + accion + '</td></tr>';
+  }).join('');
+
+  const novs = S.novedades.map(n => {
+    const c = colab(S, n.c);
+    return '<li class="renglon"><span class="pill crit-' + n.crit + '">' + CRITICIDAD[n.crit] + '</span>' +
+      '<div><p class="nombre">' + TIPOS_NOV[n.tipo] + '</p><p>' + esc(n.texto) + '</p><p class="sub">' + esc(nombreCompleto(c)) + ', ' + esc(sedeNombre(S, n.sede)) + ', ' + fechaCorta(n.f) + ' ' + hm(n.m) + (n.foto ? ', con foto' : '') + '</p></div>' +
+      '<div class="renglon-accion"><label class="oculto" for="est-' + n.id + '">Estado de la novedad</label><select id="est-' + n.id + '" data-nov="' + n.id + '">' +
+        Object.keys(ESTADOS_NOV).map(k => '<option value="' + k + '"' + (k === n.estado ? ' selected' : '') + '>' + ESTADOS_NOV[k] + '</option>').join('') + '</select></div></li>';
+  }).join('');
+
+  const bit = S.bitacora.slice(0, 6).map(b => '<li class="renglon dos"><div><p>' + esc(cap(b.texto)) + '</p><p class="sub">Supervisión, ' + fechaCorta(b.f) + ' ' + hm(b.m) + '</p></div>' +
+    (b.tipo === 'asistido' ? '<span></span>' : '<div class="renglon-accion"><button class="btn chico" type="button" data-a="deshacer" data-b="' + b.id + '" id="des-' + b.id + '">Deshacer</button></div>') + '</li>').join('');
+
+  const avisos = S.avisos.map(x => '<li class="renglon dos"><div><p>' + esc(x.texto) + '</p><p class="sub">Administración, ' + fechaCorta(x.f) + ' ' + hm(x.m) + '</p></div>' +
+    '<div class="renglon-accion"><button class="btn chico" type="button" data-a="quitar-aviso" data-id="' + x.id + '" id="av-' + x.id + '">Visto</button></div></li>').join('');
+
+  return '<div class="pagina">' +
+    '<div class="titulo-pagina"><h1>Supervisión</h1><p>' + cap(fechaLarga(S.hoy)) + ', ' + hm(S.ahora) + (fer ? '. ' + (fer.tipo === 'feriado' ? 'Feriado: ' : 'Día no laborable: ') + esc(fer.nombre) : '') + '</p></div>' +
+    '<ul class="indicadores">' +
+      '<li><b>' + pend.length + '</b><span>' + (pend.length === 1 ? 'turno para resolver' : 'turnos para resolver') + '</span></li>' +
+      '<li><b>' + enCurso + '</b><span>trabajando ahora</span></li>' +
+      '<li><b>' + sinIng + '</b><span>con demora, sin ingresar</span></li>' +
+      '<li><b>' + novAb + '</b><span>' + (novAb === 1 ? 'novedad abierta' : 'novedades abiertas') + '</span></li>' +
+    '</ul>' +
+    (avisos ? '<section class="seccion"><h2>Avisos de administración</h2><p class="bajada">Cambios de tope y asignaciones que lo superan. Quedan acá hasta que los marques como vistos.</p><ul class="panel">' + avisos + '</ul></section>' : '') +
+    '<section class="seccion"><h2>Control excedente de horas</h2><p class="bajada">Cada turno con tiempo de más o sin salida espera acá. Hasta que lo resuelvas no suma horas a la liquidación. En una misma sede, el tiempo de más siempre es hora extra.</p>' +
+      '<ul class="panel">' + (pend.length ? pend.map(casoHtml).join('') : '<li class="vacio">No hay turnos para resolver. Todo el tiempo trabajado está validado.</li>') + '</ul></section>' +
+    '<section class="seccion"><h2>Equipo de hoy</h2><div class="panel tabla-wrap"><table><thead><tr><th>Colaborador</th><th>Sede</th><th>Turno</th><th>Entrada</th><th>Salida</th><th>Estado</th><th class="num">Fichaje asistido</th></tr></thead><tbody>' +
+      (equipo || '<tr><td colspan="7">No hay turnos asignados hoy.</td></tr>') + '</tbody></table></div></section>' +
+    '<section class="seccion"><h2>Inasistencias sin justificar</h2><ul class="panel">' +
+      (inas.length ? inas.map(j => '<li class="renglon">' + chip('rojo') + '<div><p class="nombre">' + esc(nombreCompleto(colab(S, j.c))) + '</p><p class="sub">' + cap(fechaLarga(j.f)) + ', ' + esc(sedeNombre(S, j.sede)) + ' de ' + hm(j.ti) + ' a ' + hm(j.tf) + '. ' + (j.descargo ? 'Avisó: ' + esc(j.descargo) : 'Sin aviso del colaborador.') + '</p></div>' +
+        '<form class="renglon-accion" data-form="justificar" data-j="' + j.id + '"><label class="oculto" for="mot-' + j.id + '">Motivo</label><select id="mot-' + j.id + '"><option value="aviso">Ausencia con aviso</option><option value="licencia">Licencia</option><option value="franco">Franco</option></select>' +
+        '<button class="btn chico" type="submit" id="jus-' + j.id + '">Justificar</button></form></li>').join('') : '<li class="vacio">No hay inasistencias sin justificar este mes.</li>') + '</ul></section>' +
+    '<section class="seccion"><h2>Tablero de ' + nombreMes(S.hoy) + '</h2><div class="panel">' + tableroHtml() + '</div></section>' +
+    '<section class="seccion"><h2>Novedades</h2><ul class="panel">' + (novs || '<li class="vacio">No hay novedades cargadas.</li>') + '</ul></section>' +
+    '<section class="seccion"><h2>Últimas resoluciones</h2><p class="bajada">Cada corrección queda registrada con fecha y hora, y se puede deshacer.</p><ul class="panel">' + (bit || '<li class="vacio">Todavía no hay resoluciones.</li>') + '</ul></section>' +
+  '</div>';
+}
+
+/* ---------- Administración ---------- */
+
+function vistaAdmin() {
+  const t = ADMIN_TABS.some(x => x[0] === S.ui.admin) ? S.ui.admin : 'cronograma';
+  const cuerpo = t === 'personal' ? adminPersonal() : t === 'licencias' ? adminLicencias() : t === 'feriados' ? adminFeriados() : t === 'reglas' ? adminReglas() : t === 'preliquidacion' ? adminLiquidacion() : adminCronograma();
+  return '<div class="pagina">' +
+    '<div class="titulo-pagina"><h1>Administración</h1><p>' + cap(fechaLarga(S.hoy)) + ', ' + hm(S.ahora) + '</p></div>' +
+    '<nav class="subtabs" aria-label="Secciones de administración">' +
+      ADMIN_TABS.map(x => '<button type="button" data-a="admin" data-tab="' + x[0] + '" id="adm-' + x[0] + '"' + (x[0] === t ? ' aria-current="true"' : '') + '>' + x[1] + '</button>').join('') +
+    '</nav>' + cuerpo +
+  '</div>';
+}
+function regla(k, titulo, unidad, texto, min, max) {
+  return '<div class="regla"><label for="p-' + k + '">' + titulo + '</label><span class="par"><input type="number" id="p-' + k + '" data-param="' + k + '" min="' + min + '" max="' + max + '" value="' + S.P[k] + '"><span>' + unidad + '</span></span><p>' + texto + '</p></div>';
+}
+
+function diaGrilla(o, y, alto, col) {
+  const esHoy = o.f === S.hoy;
+  let estado, cuerpo = '';
+  if (!o.franjas.length) estado = '<span class="pill">Sin contrato</span>';
+  else if (o.falta) estado = '<span class="pill crit-alta">Falta cubrir</span>';
+  else estado = '<span class="pill est-resuelta">Cubierto</span>';
+  for (const x of o.franjas) cuerpo += '<div class="g-franja" style="top:' + y(x.ti) + 'px;height:' + (y(x.tf) - y(x.ti)) + 'px"></div>';
+  /* Quienes se superponen comparten el ancho en carriles; quien está solo en su horario lo ocupa entero. */
+  const grupos = [];
+  let g = null;
+  for (const p of o.personas) {
+    if (!g || p.ti >= g.fin) { g = { fin: 0, carriles: [], bloques: [] }; grupos.push(g); }
+    let l = g.carriles.findIndex(t => t <= p.ti);
+    if (l < 0) { l = g.carriles.length; g.carriles.push(0); }
+    g.carriles[l] = p.tf;
+    g.fin = Math.max(g.fin, p.tf);
+    g.bloques.push({ p: p, l: l });
+  }
+  for (const gr of grupos) {
+    const n = gr.carriles.length, ancho = 78 / n, angosto = n === 2, vertical = n >= 3;
+    for (const b of gr.bloques) {
+      const p = b.p, altoB = y(p.tf) - y(p.ti);
+      const que = p.lic ? TIPOS_LIC[p.lic.tipo] : modTexto(p.a.modalidad);
+      const texto = vertical
+        ? '<b>' + esc(corto(p.c)) + '</b>'
+        : angosto
+          ? '<b>' + esc(p.c ? p.c.nombre : '') + '</b>' + (p.lic ? '<span>' + LIC_CORTA[p.lic.tipo] + '</span>' : '<span>' + hm(p.a.ti) + '</span><span class="tercero">' + hm(p.a.tf) + '</span>')
+          : '<b>' + esc(corto(p.c)) + '</b><span>' + hm(p.a.ti) + ' a ' + hm(p.a.tf) + '</span><span class="tercero">' + que + '</span>';
+      cuerpo += '<div class="g-pers' + (p.lic ? ' aus' : '') + (angosto ? ' angosto' : '') + (vertical ? ' vertical' : '') + (altoB < 70 ? ' bajo' : '') + (altoB < 40 ? ' minimo' : '') + '" style="top:' + y(p.ti) + 'px;height:' + altoB + 'px;left:' + (b.l * ancho).toFixed(2) + '%;width:' + ancho.toFixed(2) + '%" title="' + esc(nombreCompleto(p.c) + ', ' + hm(p.a.ti) + ' a ' + hm(p.a.tf) + ', ' + que.toLowerCase() + (p.viene ? ', viene del día anterior' : '')) + '">' + texto + '</div>';
+    }
+  }
+  for (const s of o.segmentos) {
+    const altoS = y(s.tf) - y(s.ti);
+    const dice = (s.falta ? 'Falta ' + s.falta + (s.falta === 1 ? ' persona' : ' personas') : 'Cubierto') + ' de ' + hm(s.ti) + ' a ' + (s.tf === 1440 ? '24:00' : hm(s.tf)) + ': ' + s.pres + ' de ' + s.req;
+    cuerpo += '<div class="g-seg ' + (s.falta ? 'falta' : 'ok') + '" style="top:' + y(s.ti) + 'px;height:' + altoS + 'px" title="' + dice + '" aria-label="' + dice + '">' + (altoS >= 16 ? '<b>' + s.pres + '/' + s.req + '</b>' : '') + '</div>';
+  }
+  return '<div class="g-dia' + (esHoy ? ' hoy' : '') + '" style="grid-column:' + col + '"><div class="g-cab"><span class="g-fecha"><strong>' + cap(fechaCorta(o.f)) + (esHoy ? ', hoy' : '') + '</strong>' + pillFeriado(o.f) + '</span>' + estado + '</div><div class="g-cuerpo" style="height:' + alto + 'px">' + cuerpo + '</div></div>';
+}
+
+function adminCronograma() {
+  const sede = S.sedes.some(s => s.id === S.ui.sedeGrilla) ? S.ui.sedeGrilla : S.sedes[0].id;
+  const lunes = S.ui.semana || lunesDe(S.hoy);
+  const dias = SEMANA.map(i => sumarDias(lunes, i - 1));
+  const cbs = dias.map(f => coberturaDia(S, sede, f));
+  let t0 = 1440, t1 = 0;
+  for (const o of cbs) for (const x of o.franjas.concat(o.personas)) { t0 = Math.min(t0, x.ti); t1 = Math.max(t1, x.tf); }
+  if (t0 >= t1) { t0 = 480; t1 = 1080; }
+  t0 = Math.max(0, Math.floor(t0 / 60) * 60 - 60);
+  t1 = Math.min(1440, Math.ceil(t1 / 60) * 60 + 60);
+  const largo = t1 - t0 > 900;
+  const px = largo ? 0.5 : 0.7, paso = largo ? 120 : 60;
+  const alto = Math.round((t1 - t0) * px);
+  const y = m => Math.round((Math.min(t1, Math.max(t0, m)) - t0) * px);
+  let eje = '';
+  for (let h = Math.ceil(t0 / paso) * paso; h <= t1; h += paso) eje += '<span style="top:' + y(h) + 'px">' + (h === 1440 ? '24:00' : hm(h)) + '</span>';
+
+  const selSedes = S.sedes.map(s => {
+    const n = dias.filter(f => coberturaDia(S, s.id, f).falta).length;
+    return '<button type="button" data-a="sede-grilla" data-sede="' + s.id + '" id="sg-' + s.id + '"' + (s.id === sede ? ' aria-current="true"' : '') + '><b>' + esc(s.nombre) + '</b><span>' + (n ? n + (n === 1 ? ' día con franjas sin cubrir' : ' días con franjas sin cubrir') : 'Semana cubierta') + '</span></button>';
+  }).join('');
+
+  const d = S.ui.drafts;
+  const franjas = S.franjas.filter(x => x.sede === sede).sort((a, b) => a.ti - b.ti);
+  const filasFr = franjas.map(x => {
+    const at = 'data-franja="' + x.id + '"';
+    return '<li class="fila-flex">' + diasHtml('fr-dia-' + x.id, at + ' data-campo="dia"', x.dias) +
+      '<span class="par"><input type="time" id="fr-ti-' + x.id + '" ' + at + ' data-campo="ti" value="' + hm(x.ti) + '" aria-label="Desde"><span>a</span><input type="time" id="fr-tf-' + x.id + '" ' + at + ' data-campo="tf" value="' + hm(x.tf) + '" aria-label="Hasta"></span>' +
+      (x.tf > 1440 ? '<span class="pill">Termina al día siguiente</span>' : x.tf - x.ti === 1440 ? '<span class="pill">Las 24 horas</span>' : '') +
+      '<span class="par"><input type="number" class="corto" id="fr-dot-' + x.id + '" ' + at + ' data-campo="dot" min="1" max="30" value="' + x.dot + '" aria-label="Personas contratadas"><span>' + (x.dot === 1 ? 'persona' : 'personas') + '</span></span>' +
+      '<button class="btn chico empuja" type="button" data-a="quitar-franja" data-id="' + x.id + '" id="fr-q-' + x.id + '">Quitar</button></li>';
+  }).join('');
+  const formFr = '<form class="form-alta" data-form="franja" novalidate>' +
+    '<fieldset class="campo"><legend>Días</legend>' + diasHtml('nf-dia', 'data-draftdia="frDias" data-base="7"', borradorDias('frDias', SEMANA)) + '</fieldset>' +
+    '<label class="campo" for="nf-ti">Desde<input type="time" id="nf-ti" data-draft="frTi" value="' + esc(d.frTi || '08:00') + '"></label>' +
+    '<label class="campo" for="nf-tf">Hasta<input type="time" id="nf-tf" data-draft="frTf" value="' + esc(d.frTf || '12:00') + '"></label>' +
+    '<label class="campo" for="nf-dot">Personas<input type="number" id="nf-dot" data-draft="frDot" min="1" max="30" value="' + esc(d.frDot || '1') + '"></label>' +
+    '<button class="btn primario" type="submit" id="btn-franja">Agregar franja contratada</button>' +
+    '<p class="error" role="alert">' + esc(S.ui.errores.franja || '') + '</p>' +
+  '</form>';
+
+  const hs = huecos(S, 28).map(h => {
+    const n = h.fechas.length, cuando = n === 1 ? cap(fechaLarga(h.fechas[0])) + '.' : n + ' días entre el ' + fechaMedia(h.fechas[0]) + ' y el ' + fechaMedia(h.fechas[n - 1]) + '.';
+    return '<li class="renglon dos"><div><p class="nombre">' + esc(sedeNombre(S, h.sede)) + ', ' + hm(h.ti) + ' a ' + hm(h.tf) + '</p><p class="sub">Falta ' + h.falta + (h.falta === 1 ? ' persona' : ' personas') + (h.causa === 'sin asignación' ? ', sin asignación' : ': ' + esc(h.causa)) + '. ' + cuando + '</p></div>' +
+      '<div class="renglon-accion"><button class="btn chico" type="button" data-a="ver-hueco" data-sede="' + h.sede + '" data-f="' + h.fechas[0] + '">Ver en la grilla</button></div></li>';
+  }).join('');
+
+  return '<section class="seccion" id="grilla-seccion">' +
+      '<h2>Grilla por sede</h2><p class="bajada">Cada columna es un día, de lunes a domingo. La banda de color es el horario contratado por el cliente y los bloques son las personas asignadas. La tira de la derecha cuenta las personas asignadas sobre las contratadas: en rojo, falta gente.</p>' +
+      '<div class="sedes-sel">' + selSedes + '</div>' +
+      '<div class="panel">' +
+        '<div class="semana-nav"><strong>Semana ' + rango(dias[0], dias[6]) + '</strong>' +
+          '<button class="btn chico" type="button" data-a="semana" data-d="-7" id="sem-ant">Semana anterior</button>' +
+          '<button class="btn chico" type="button" data-a="semana" data-d="0" id="sem-hoy">Esta semana</button>' +
+          '<button class="btn chico" type="button" data-a="semana" data-d="7" id="sem-sig">Semana siguiente</button></div>' +
+        '<div class="grilla-wrap"><div class="grilla" style="--hora:' + Math.round(60 * px) + 'px"><div class="g-eje" style="height:' + alto + 'px">' + eje + '</div>' + cbs.map((o, i) => diaGrilla(o, y, alto, i + 2)).join('') + '</div></div>' +
+        '<ul class="leyenda"><li><span class="m-franja"></span>Horario contratado</li><li><span class="m-pers"></span>Persona asignada</li><li><span class="m-pers aus"></span>Con licencia, vacaciones o franco</li><li><span class="m-seg"></span>Asignadas sobre contratadas: cubierto</li><li><span class="m-seg falta"></span>Falta gente</li></ul>' +
+      '</div></section>' +
+    '<section class="seccion"><h2>Horario contratado en ' + esc(sedeNombre(S, sede)) + '</h2><p class="bajada">Lo que el cliente contrató: días, franja horaria y cuántas personas tienen que estar. Si la hora de fin no es posterior a la de inicio, la franja termina al día siguiente.</p>' +
+      '<div class="panel"><ul>' + (filasFr || '<li class="vacio">Esta sede todavía no tiene horario contratado.</li>') + '</ul>' + formFr + '</div></section>' +
+    '<section class="seccion"><h2>Franjas sin cubrir en las próximas cuatro semanas</h2><p class="bajada">Todas las sedes, desde hoy. Se cubren con una asignación nueva o una cobertura con fecha desde Personal y asignaciones.</p>' +
+      '<ul class="panel">' + (hs || '<li class="vacio">Todo el horario contratado está cubierto.</li>') + '</ul></section>';
+}
+
+function adminPersonal() {
+  const d = S.ui.drafts;
+  let filas = '';
+  for (const c of S.colabs) {
+    const n = esc(nombreCompleto(c));
+    asigsDe(S, c.id).forEach((a, i) => {
+      const at = 'data-asig="' + a.id + '"';
+      const vig = a.desde || a.hasta ? (a.desde && a.hasta ? cap(rango(a.desde, a.hasta)) : a.desde ? 'Desde el ' + fechaMedia(a.desde) : 'Hasta el ' + fechaMedia(a.hasta)) : 'Permanente';
+      filas += '<tr>' +
+        '<td>' + (i === 0 ? '<input type="text" id="c-nombre-' + c.id + '" data-colab="' + c.id + '" value="' + n + '" maxlength="60" aria-label="Nombre">' : '<span class="mismo">' + n + '</span>') + '</td>' +
+        '<td><select id="a-sede-' + a.id + '" ' + at + ' data-campo="sede" aria-label="Sede">' + sedesOp(a.sede) + '</select></td>' +
+        '<td>' + diasHtml('a-dia-' + a.id, at + ' data-campo="dia"', a.dias) + '</td>' +
+        '<td><span class="par"><input type="time" id="a-ti-' + a.id + '" ' + at + ' data-campo="ti" value="' + hm(a.ti) + '" aria-label="Inicio del turno"><span>a</span><input type="time" id="a-tf-' + a.id + '" ' + at + ' data-campo="tf" value="' + hm(a.tf) + '" aria-label="Fin del turno"></span></td>' +
+        '<td><select id="a-mod-' + a.id + '" ' + at + ' data-campo="modalidad" aria-label="Modalidad de pago">' + modOp(a.modalidad) + '</select></td>' +
+        '<td><span class="par"><input type="number" id="a-valor-' + a.id + '" ' + at + ' data-campo="valor" value="' + a.valor + '" min="1" step="100" aria-label="' + (a.modalidad === 'hora' ? 'Valor hora' : 'Monto fijo mensual') + '"><span>' + (a.modalidad === 'hora' ? 'por hora' : 'por mes') + '</span></span></td>' +
+        '<td>' + vig + '</td>' +
+        '<td><label class="tilde"><input type="checkbox" id="a-activa-' + a.id + '" ' + at + ' data-campo="activa"' + (a.activa ? ' checked' : '') + ' aria-label="Asignación activa"></label></td>' +
+      '</tr>';
+    });
+  }
+  const al = alertas(S);
+  const selC = d.asigColab || 'nuevo', mod = d.asigMod || 'hora';
+  const form = '<form class="form-alta" data-form="asig" novalidate>' +
+    '<label class="campo" for="as-colab">Colaborador<select id="as-colab" data-draft="asigColab"><option value="nuevo"' + (selC === 'nuevo' ? ' selected' : '') + '>Nuevo colaborador</option>' +
+      S.colabs.map(c => '<option value="' + c.id + '"' + (c.id === selC ? ' selected' : '') + '>' + esc(nombreCompleto(c)) + '</option>').join('') + '</select></label>' +
+    (selC === 'nuevo' ? '<label class="campo" for="as-nombre">Nombre y apellido<input type="text" id="as-nombre" data-draft="asigNombre" maxlength="60" value="' + esc(d.asigNombre || '') + '"></label>' : '') +
+    '<label class="campo" for="as-sede">Sede<select id="as-sede" data-draft="asigSede">' + sedesOp(d.asigSede || S.sedes[0].id) + '</select></label>' +
+    '<fieldset class="campo"><legend>Días</legend>' + diasHtml('as-dia', 'data-draftdia="asigDias" data-base="5"', borradorDias('asigDias', [1, 2, 3, 4, 5])) + '</fieldset>' +
+    '<label class="campo" for="as-ti">Turno desde<input type="time" id="as-ti" data-draft="asigTi" value="' + esc(d.asigTi || '08:00') + '"></label>' +
+    '<label class="campo" for="as-tf">Turno hasta<input type="time" id="as-tf" data-draft="asigTf" value="' + esc(d.asigTf || '14:00') + '"></label>' +
+    '<label class="campo" for="as-mod">Modalidad de pago<select id="as-mod" data-draft="asigMod">' + modOp(mod) + '</select></label>' +
+    '<label class="campo" for="as-valor">' + (mod === 'hora' ? 'Valor hora' : 'Monto fijo mensual') + '<input type="number" id="as-valor" data-draft="asigValor" min="1" step="100" value="' + esc(d.asigValor || S.ref[mod]) + '"></label>' +
+    '<label class="campo" for="as-desde">Vigente desde, opcional<input type="date" id="as-desde" data-draft="asigDesde" value="' + esc(d.asigDesde || '') + '"></label>' +
+    '<label class="campo" for="as-hasta">Vigente hasta, opcional<input type="date" id="as-hasta" data-draft="asigHasta" value="' + esc(d.asigHasta || '') + '"></label>' +
+    '<button class="btn primario" type="submit" id="btn-asig">Agregar asignación</button>' +
+    '<p class="error" role="alert">' + esc(S.ui.errores.asig || '') + '</p>' +
+  '</form>';
+  return '<section class="seccion"><h2>Personal y asignaciones</h2><p class="bajada">Una asignación es una persona en una sede, con sus días, su turno y su modalidad de pago. Quien trabaja en dos sedes tiene dos, y cada una puede ser fija o por hora. En una misma sede hay una sola: el tiempo de más ahí es hora extra. Un turno que termina antes de la hora en que empieza cruza la medianoche.</p>' +
+    '<div class="panel"><div class="tabla-wrap"><table class="tabla-edit"><thead><tr><th>Colaborador</th><th>Sede</th><th>Días</th><th>Turno asignado</th><th>Modalidad</th><th>Valor de ejemplo</th><th>Vigencia</th><th>Activa</th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
+    (al.length ? '<ul class="alertas">' + al.map(x => '<li class="nota obs">' + esc(x.texto) + '</li>').join('') + '</ul>' : '') +
+    form + '</div></section>';
+}
+
+function adminLicencias() {
+  const d = S.ui.drafts;
+  const ls = S.licencias.slice().sort((a, b) => {
+    const pa = a.hasta < S.hoy ? 1 : 0, pb = b.hasta < S.hoy ? 1 : 0;
+    if (pa !== pb) return pa - pb;
+    return pa ? (a.desde < b.desde ? 1 : -1) : (a.desde < b.desde ? -1 : 1);
+  });
+  const filas = ls.map(l => {
+    const c = colab(S, l.c);
+    const estado = l.hasta < S.hoy ? '<span class="pill">Terminada</span>' : l.desde <= S.hoy ? '<span class="pill est-en_curso">En curso</span>' : '<span class="pill est-resuelta">Próxima</span>';
+    const sedes = asigsDe(S, l.c).filter(a => a.activa).map(a => sedeNombre(S, a.sede)).join(' y ');
+    return '<tr><td><span class="nombre">' + esc(nombreCompleto(c)) + '</span></td><td>' + TIPOS_LIC[l.tipo] + '</td><td>' + cap(rango(l.desde, l.hasta)) + '</td><td class="num">' + diasCorridos(l.desde, l.hasta) + '</td><td>' + esc(sedes || 'Sin asignaciones') + '</td><td>' + estado + '</td>' +
+      '<td class="num"><button class="btn chico" type="button" data-a="quitar-licencia" data-id="' + l.id + '" id="lic-q-' + l.id + '">Quitar</button></td></tr>';
+  }).join('');
+  const manana = sumarDias(S.hoy, 1);
+  const form = '<form class="form-alta" data-form="licencia" novalidate>' +
+    '<label class="campo" for="li-colab">Colaborador<select id="li-colab" data-draft="licColab">' + S.colabs.map(c => '<option value="' + c.id + '"' + (c.id === d.licColab ? ' selected' : '') + '>' + esc(nombreCompleto(c)) + '</option>').join('') + '</select></label>' +
+    '<label class="campo" for="li-tipo">Tipo<select id="li-tipo" data-draft="licTipo">' + Object.keys(TIPOS_LIC).map(k => '<option value="' + k + '"' + (k === (d.licTipo || 'vacaciones') ? ' selected' : '') + '>' + TIPOS_LIC[k] + '</option>').join('') + '</select></label>' +
+    '<label class="campo" for="li-desde">Primer día<input type="date" id="li-desde" data-draft="licDesde" value="' + esc(d.licDesde || manana) + '"></label>' +
+    '<label class="campo" for="li-hasta">Último día<input type="date" id="li-hasta" data-draft="licHasta" value="' + esc(d.licHasta || d.licDesde || manana) + '"></label>' +
+    '<button class="btn primario" type="submit" id="btn-licencia">Cargar ausencia</button>' +
+    '<p class="error" role="alert">' + esc(S.ui.errores.licencia || '') + '</p>' +
+  '</form>';
+  return '<section class="seccion"><h2>Licencias y vacaciones</h2><p class="bajada">Al cargar una ausencia, esos días quedan justificados en el semáforo, la persona no tiene que fichar y la grilla muestra su franja sin cubrir para que se pueda asignar un reemplazo.</p>' +
+    '<div class="panel"><div class="tabla-wrap"><table><thead><tr><th>Colaborador</th><th>Tipo</th><th>Fechas</th><th class="num">Días corridos</th><th>Sedes que deja sin cubrir</th><th>Estado</th><th class="num">Acción</th></tr></thead><tbody>' +
+    (filas || '<tr><td colspan="7">No hay ausencias cargadas.</td></tr>') + '</tbody></table></div>' + form + '</div></section>';
+}
+
+function adminFeriados() {
+  const d = S.ui.drafts;
+  const sugerido = S.P.recFeriado === SUGERIDO.recFeriado && S.P.recNoLab === SUGERIDO.recNoLab;
+  const desde = mesDe(S.hoy) + '-01';
+  const filas = S.feriados.filter(x => x.f >= desde).map(x => {
+    const paso = x.f < S.hoy, imp = paso ? null : impactoFeriado(S, x);
+    return '<tr><td><span class="nombre">' + cap(fechaLarga(x.f)) + ' de ' + x.f.slice(0, 4) + '</span></td><td>' + esc(x.nombre) + (x.propio ? ' <span class="pill">Agregado</span>' : '') + (x.nota ? '<span class="sub">' + esc(x.nota) + '</span>' : '') + '</td>' +
+      '<td><select id="fe-tipo-' + x.f + '" data-feriado="' + x.f + '" aria-label="Tipo de día">' + Object.keys(TIPOS_FERIADO).map(k => '<option value="' + k + '"' + (k === x.tipo ? ' selected' : '') + '>' + TIPOS_FERIADO[k] + '</option>').join('') + '</select></td>' +
+      '<td class="num">' + (paso ? 'Ya pasó' : imp.turnos) + '</td><td class="num">' + (paso ? '' : imp.porHora ? imp.porHora + (imp.porHora === 1 ? ' turno, ' : ' turnos, ') + dur(imp.minHora) : 'Ninguno') + '</td><td class="num">' + (paso ? '' : '<strong>' + ARS.format(imp.recargo) + '</strong>') + '</td>' +
+      '<td class="num"><button class="btn chico" type="button" data-a="quitar-feriado" data-f="' + x.f + '" id="fe-q-' + x.f + '">Quitar</button></td></tr>';
+  }).join('');
+  const form = '<form class="form-alta" data-form="feriado" novalidate>' +
+    '<label class="campo" for="fe-f">Fecha<input type="date" id="fe-f" data-draft="ferF" value="' + esc(d.ferF || '') + '"></label>' +
+    '<label class="campo" for="fe-nombre">Nombre<input type="text" id="fe-nombre" data-draft="ferNombre" maxlength="80" value="' + esc(d.ferNombre || '') + '"></label>' +
+    '<label class="campo" for="fe-tipo">Tipo<select id="fe-tipo" data-draft="ferTipo">' + Object.keys(TIPOS_FERIADO).map(k => '<option value="' + k + '"' + (k === (d.ferTipo || 'feriado') ? ' selected' : '') + '>' + TIPOS_FERIADO[k] + '</option>').join('') + '</select></label>' +
+    '<button class="btn primario" type="submit" id="btn-feriado">Agregar fecha</button>' +
+    '<p class="error" role="alert">' + esc(S.ui.errores.feriado || '') + '</p>' +
+  '</form>';
+  return '<section class="seccion"><h2>Tratamiento sugerido para el pago por hora</h2><p class="bajada">El sistema separa las horas trabajadas en feriado y propone cómo pagarlas. La sugerencia sigue el criterio general de la Ley de Contrato de Trabajo: feriado nacional trabajado, pago doble; día no laborable, pago simple. Pueden cambiarla, y conviene validarla con su asesor laboral.</p>' +
+      '<div class="panel reglas">' +
+        regla('recFeriado', 'Hora trabajada en feriado nacional', '% de recargo', 'Sugerido: ' + SUGERIDO.recFeriado + '. La hora se paga doble.', 0, 300) +
+        regla('recNoLab', 'Hora trabajada en día no laborable', '% de recargo', 'Sugerido: ' + SUGERIDO.recNoLab + '. La hora se paga simple.', 0, 300) +
+        '<div class="regla"><p class="nombre">Asignaciones fijas</p><p>Se liquidan según convenio. El sistema cuenta sus horas en feriado y las muestra aparte, sin calcular importe.</p>' +
+          (sugerido ? '<p><span class="pill est-resuelta">Usando lo sugerido</span></p>' : '<button class="btn chico" type="button" data-a="sugerido" id="btn-sugerido">Volver a lo sugerido</button>') + '</div>' +
+      '</div></section>' +
+    '<section class="seccion"><h2>Calendario de feriados</h2><p class="bajada">Agenda nacional: lo que queda de 2026 y el calendario 2027 que surge de la Ley 27.399. Faltan los días no laborables con fines turísticos de 2027, que todavía no se publicaron: se agregan desde acá, igual que los feriados provinciales o los asuetos propios. Para cada fecha que viene, el sistema estima, con las asignaciones de hoy, cuántos turnos por hora caen ese día y cuánto suma el recargo.</p>' +
+      '<div class="panel"><div class="tabla-wrap"><table class="tabla-fer"><thead><tr><th>Fecha</th><th>Nombre</th><th>Tipo</th><th class="num">Turnos ese día</th><th class="num">Por hora</th><th class="num">Recargo estimado</th><th class="num">Acción</th></tr></thead><tbody>' +
+      (filas || '<tr><td colspan="7">No hay fechas cargadas.</td></tr>') + '</tbody></table></div>' + form + '</div></section>';
+}
+
+function adminReglas() {
+  return '<section class="seccion"><h2>Reglas del semáforo</h2><p class="bajada">Cambiá un valor y todos los turnos se vuelven a calcular, también los de días anteriores.</p>' +
+      '<div class="panel reglas">' +
+        regla('gracia', 'Gracia de llegada', 'minutos', 'Hasta esta demora el turno sigue en verde.', 0, 180) +
+        regla('rojo', 'Demora que pasa a rojo', 'minutos', 'Entre la gracia y este valor queda en amarillo. Por encima, en rojo.', 0, 180) +
+        regla('margen', 'Margen de salida', 'minutos', 'Con más tiempo de más que este valor se abre el control excedente.', 0, 180) +
+      '</div></section>' +
+    '<section class="seccion"><h2>Topes de horas por día</h2><p class="bajada">Se pueden cambiar cuando haga falta. Cada cambio le llega como aviso al supervisor, igual que cada asignación que supera el tope. No bloquean la carga.</p>' +
+      '<div class="panel reglas">' +
+        regla('topeFijo', 'Tope en asignaciones fijas', 'horas', 'Suma de las horas fijas de una persona en el día.', 1, 24) +
+        regla('topeHora', 'Tope para quien trabaja por hora', 'horas', 'Total del día de una persona con algún turno por hora, contando también sus horas fijas.', 1, 24) +
+        regla('traslado', 'Tiempo mínimo entre sedes', 'minutos', 'Avisa cuando el fin de un turno y el inicio del siguiente en otra sede quedan más cerca que esto.', 0, 180) +
+      '</div></section>';
+}
+
+function adminLiquidacion() {
+  const mes = mesDe(S.hoy);
+  let total = 0, filas = '';
+  for (const c of S.colabs) {
+    let sub = 0, cuantas = 0;
+    for (const a of asigsDe(S, c.id)) {
+      const r = resumenAsig(S, a.id, mes);
+      if (!r.jornadas && !r.justificada) continue;
+      const base = baseAsig(S, a, r), rec = recargoFeriado(S, a, r), fer = r.fer.feriado + r.fer.no_laborable;
+      sub += base; cuantas++;
+      const chips = [['verde', r.verde], ['estrella', r.estrella], ['amarillo', r.amarillo], ['rojo', r.rojo], ['revision', r.revision]].filter(x => x[1] > 0).map(x => chip(x[0], x[1])).join('');
+      const rev = r.enRevision || r.sinSalida ? [r.enRevision ? dur(r.enRevision) : '', r.sinSalida ? r.sinSalida + ' sin salida' : ''].filter(Boolean).join(', ') : 'Nada';
+      const celFer = (r.fer.feriado ? dur(r.fer.feriado) : 'Nada') + (r.fer.no_laborable ? '<span class="sub">no&nbsp;laborable: ' + nb(dur(r.fer.no_laborable)) + '</span>' : '');
+      const notaFer = a.modalidad === 'hora' ? (rec ? '<span class="sub">incluye&nbsp;' + ARS.format(rec) + ' por&nbsp;feriado</span>' : '') : fer ? '<span class="sub">feriado según&nbsp;convenio</span>' : '';
+      filas += '<tr><td><span class="nombre">' + esc(nombreCompleto(c)) + '</span><span class="sub">' + esc(sedeNombre(S, a.sede)) + ', ' + modTexto(a.modalidad).toLowerCase() + '</span></td><td><span class="chips">' + chips + '</span></td>' +
+        '<td class="num">' + dur(r.asignadas) + '</td><td class="num">' + dur(r.normales) + '</td><td class="num">' + celFer + '</td><td class="num">' + (r.extra ? dur(r.extra) : 'Nada') + '</td><td class="num">' + rev + '</td><td class="num">' + r.inasistencias + '</td><td class="num"><strong>' + ARS.format(base) + '</strong>' + notaFer + '</td></tr>';
+    }
+    if (cuantas > 1) filas += '<tr class="subtotal"><td colspan="8">Total de ' + esc(nombreCompleto(c)) + ', ' + cuantas + ' asignaciones</td><td class="num"><strong>' + ARS.format(sub) + '</strong></td></tr>';
+    total += sub;
+  }
+  return '<section class="seccion"><h2>Preliquidación de ' + nombreMes(S.hoy) + '</h2><p class="bajada">Turnos cerrados hasta el ' + fechaLarga(S.hoy) + ', una línea por asignación. Las horas en feriado y en día no laborable se cuentan aparte: en las asignaciones por hora suman el recargo definido en Feriados, y en las fijas quedan según convenio.</p>' +
+    '<div class="panel"><div class="tabla-wrap"><table class="tabla-liq"><thead><tr><th>Colaborador y asignación</th><th>Semáforo del mes</th><th class="num">Horas asignadas</th><th class="num">Horas validadas</th><th class="num">En feriado</th><th class="num">Extra verificadas</th><th class="num">En revisión</th><th class="num">Inasistencias</th><th class="num">Base estimada</th></tr></thead><tbody>' + filas + '</tbody>' +
+    '<tfoot><tr><td colspan="8">Base estimada del equipo</td><td class="num"><strong>' + ARS.format(total) + '</strong></td></tr></tfoot></table></div>' +
+    '<p class="pie-tabla">Valores de ejemplo. La base de una asignación por hora son sus horas validadas por el valor hora, más el recargo de feriado. La de una fija es su monto mensual: su liquidación va según convenio y queda para definir. Tampoco suman todavía la hora extra ni el descuento por inasistencia, que figuran aparte.</p></div></section>';
+}
+
+/* ---------- Dibujo ---------- */
+
+function render() {
+  if (!S) return;
+  const act = document.activeElement && document.activeElement.id;
+  const sc = $('#pantalla'), top = sc ? sc.scrollTop : 0;
+  const r = ruta();
+  $('#reloj-fecha').textContent = cap(fechaLarga(S.hoy));
+  $('#reloj-hora').value = hm(S.ahora);
+  document.querySelectorAll('.roles a').forEach(a => {
+    if (a.getAttribute('href') === '#' + r) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
+  $('#vista').innerHTML = r === 'supervisor' ? vistaSupervisor() : r === 'administracion' ? vistaAdmin() : vistaColab();
+  const sc2 = $('#pantalla');
+  if (sc2) sc2.scrollTop = S.ui.arriba ? 0 : top;
+  S.ui.arriba = false;
+  S.ui.festejo = null;
+  if (act) {
+    const el = document.getElementById(act);
+    if (el && el !== document.activeElement) { try { el.focus({ preventScroll: true }); } catch (e) { /* sin foco */ } }
+  }
+  guardar();
+}
+
+function ponerHora(min) {
+  if (min == null || isNaN(min)) { aviso('Escribí una hora válida.'); render(); return; }
+  if (min < S.ahora) { aviso('El reloj de la demo solo avanza. Para volver atrás, reiniciá la demo o pasá al día siguiente.'); render(); return; }
+  S.ahora = Math.min(1439, min);
+  tick(S);
+  render();
+}
+function limpiarColab() { S.ui.cierre = null; S.ui.recien = null; S.ui.descargo = null; S.ui.errores = {}; S.ui.arriba = true; }
+function alternarDia(lista, dia, marcado) {
+  const l = lista.slice(), i = l.indexOf(dia);
+  if (marcado && i < 0) l.push(dia);
+  if (!marcado && i >= 0) l.splice(i, 1);
+  return l.sort((a, b) => a - b);
+}
+
+/* ---------- Eventos ---------- */
+
+document.addEventListener('click', ev0 => {
+  const b = ev0.target.closest('[data-a]');
+  if (!b || !S) return;
+  const a = b.dataset.a, c = colabSel(S);
+  const act = c ? tramoActual(S, c.id) : null;
+  let subir = false;
+  if (a === 'tab') { limpiarColab(); S.ui.tab = b.dataset.tab; }
+  else if (a === 'entrada') {
+    const j = act ? marcarEntrada(S, act.id) : null;
+    if (j) aviso('Entrada registrada a las ' + hm(j.entrada) + ' en ' + sedeNombre(S, j.sede) + '.');
+  }
+  else if (a === 'abrir-cierre') {
+    if (act) { act.manual = true; act.tocada = true; }
+    S.ui.cierre = { ok: false, otras: false, que: null, error: '' };
+    S.ui.drafts.cierreTexto = ''; S.ui.drafts.cierreHora = ''; S.ui.arriba = true;
+  }
+  else if (a === 'cancelar-cierre') S.ui.cierre = null;
+  else if (a === 'otras-horas') { if (S.ui.cierre) { S.ui.cierre.otras = !S.ui.cierre.otras; S.ui.cierre.ok = false; S.ui.cierre.error = ''; } }
+  else if (a === 'proximo') { S.ui.recien = null; S.ui.arriba = true; }
+  else if (a === 'abrir-descargo') { S.ui.descargo = b.dataset.j; S.ui.drafts.descargo = ''; S.ui.errores.descargo = ''; }
+  else if (a === 'hora') { ponerHora(Number(b.dataset.min)); return; }
+  else if (a === 'mas') { ponerHora(Math.min(1439, S.ahora + Number(b.dataset.min))); return; }
+  else if (a === 'dia') { avanzarDia(S); limpiarColab(); S.ui.detalle = null; S.ui.tab = 'hoy'; S.ui.semana = lunesDe(S.hoy); aviso('Empezó el ' + fechaLarga(S.hoy) + '. Son las ' + hm(S.ahora) + '.'); }
+  else if (a === 'reiniciar') { S = sembrar(); aviso('Demo reiniciada con los datos de ejemplo.'); }
+  else if (a === 'asistido') {
+    const que = fichajeAsistido(S, b.dataset.j);
+    if (que) aviso(cap(S.bitacora[0].texto) + '.');
+  }
+  else if (a === 'detalle') S.ui.detalle = S.ui.detalle === b.dataset.j ? null : b.dataset.j;
+  else if (a === 'deshacer') { deshacer(S, b.dataset.b); aviso('Resolución deshecha.'); }
+  else if (a === 'quitar-aviso') quitarAviso(S, b.dataset.id);
+  else if (a === 'admin') { S.ui.admin = b.dataset.tab; S.ui.errores = {}; }
+  else if (a === 'sede-grilla') S.ui.sedeGrilla = b.dataset.sede;
+  else if (a === 'semana') { const n = Number(b.dataset.d); S.ui.semana = n ? sumarDias(S.ui.semana || lunesDe(S.hoy), n) : lunesDe(S.hoy); }
+  else if (a === 'ver-hueco') { S.ui.sedeGrilla = b.dataset.sede; S.ui.semana = lunesDe(b.dataset.f); S.ui.admin = 'cronograma'; subir = true; }
+  else if (a === 'quitar-franja') { quitarFranja(S, b.dataset.id); aviso('Franja contratada quitada.'); }
+  else if (a === 'quitar-licencia') { quitarLicencia(S, b.dataset.id); aviso('Ausencia quitada.'); }
+  else if (a === 'quitar-feriado') { quitarFeriado(S, b.dataset.f); aviso('Fecha quitada del calendario.'); }
+  else if (a === 'sugerido') { ponerParam(S, 'recFeriado', SUGERIDO.recFeriado); ponerParam(S, 'recNoLab', SUGERIDO.recNoLab); aviso('Tratamiento sugerido aplicado.'); }
+  render();
+  if (subir) { const g = $('#grilla-seccion'); if (g) { try { g.scrollIntoView({ block: 'start' }); } catch (e) { /* sin desplazamiento */ } } }
+});
+
+document.addEventListener('input', ev0 => {
+  const t = ev0.target;
+  if (!S || !t.dataset || !t.dataset.draft) return;
+  if (t.type === 'radio' && !t.checked) return;
+  S.ui.drafts[t.dataset.draft] = t.value;
+  guardar();
+});
+
+document.addEventListener('change', ev0 => {
+  const t = ev0.target;
+  if (!S || !t || !t.dataset) return;
+  const ds = t.dataset;
+  if (t.id === 'reloj-hora') { ponerHora(aMin(t.value)); return; }
+  if (t.id === 'sel-colab') { elegirColab(S, t.value); limpiarColab(); render(); return; }
+  if (t.name === 'que' && S.ui.cierre) { S.ui.cierre.que = t.value; S.ui.cierre.error = ''; render(); return; }
+  if (t.id === 'cierre-ok' && S.ui.cierre) { S.ui.cierre.ok = t.checked; S.ui.cierre.error = ''; guardar(); return; }
+  if (ds.caso) {
+    if (ds.campo === 'que') { S.ui.casos[ds.caso] = { que: t.value }; render(); }
+    else { const j = porId(S, ds.caso); S.ui.casos[ds.caso] = Object.assign({}, S.ui.casos[ds.caso], { hora: j ? aRel(j, aMin(t.value)) : null, error: '' }); guardar(); }
+    return;
+  }
+  let err = null;
+  const avisosAntes = S.avisos.length;
+  if (ds.colab) err = editarNombre(S, ds.colab, t.value);
+  else if (ds.asig) err = editarAsig(S, ds.asig, ds.campo, t.type === 'checkbox' ? t.checked : t.value, ds.dia);
+  else if (ds.franja) err = editarFranja(S, ds.franja, ds.campo, t.type === 'checkbox' ? t.checked : t.value, ds.dia);
+  else if (ds.feriado) err = editarFeriado(S, ds.feriado, t.value);
+  else if (ds.param) err = ponerParam(S, ds.param, t.value);
+  if (err !== null) {
+    if (err) aviso(err);
+    else if (S.avisos.length > avisosAntes) aviso(ds.param ? 'Tope actualizado. Supervisión ya tiene el aviso.' : 'La asignación supera el tope diario. Supervisión ya tiene el aviso.');
+    render();
+    return;
+  }
+  if (ds.nov) { estadoNovedad(S, ds.nov, t.value); render(); return; }
+  if (ds.draftdia) { S.ui.drafts[ds.draftdia] = alternarDia(borradorDias(ds.draftdia, ds.base === '7' ? SEMANA : [1, 2, 3, 4, 5]), Number(ds.dia), t.checked); guardar(); return; }
+  if (ds.draft) {
+    if (t.type === 'radio' && !t.checked) return;
+    S.ui.drafts[ds.draft] = t.value;
+    if (t.id === 'as-mod') { S.ui.drafts.asigValor = ''; render(); return; }
+    if (t.id === 'as-colab') { render(); return; }
+    if (t.id === 'li-desde' && (!S.ui.drafts.licHasta || S.ui.drafts.licHasta < t.value)) { S.ui.drafts.licHasta = t.value; render(); return; }
+    guardar();
+  }
+});
+
+document.addEventListener('submit', ev0 => {
+  const f = ev0.target.closest('form[data-form]');
+  if (!f || !S) return;
+  ev0.preventDefault();
+  const tipo = f.dataset.form, c = colabSel(S), d = S.ui.drafts;
+  const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const limpiar = claves => claves.forEach(k => { delete d[k]; });
+  if (tipo === 'cierre') {
+    const j = c ? tramoActual(S, c.id) : null, k = S.ui.cierre;
+    if (!j || j.entrada == null || !k) { render(); return; }
+    const rel = relDe(S, j), exc = rel - j.tf;
+    let datos = null;
+    if (exc > S.P.margen) {
+      if (k.que === 'extra') datos = { conf: false, decl: { tipo: 'extra', hora: null, texto: String(d.cierreTexto || '').trim().slice(0, 200) } };
+      else if (k.que === 'olvido') {
+        const h = aRel(j, aMin(val('cierre-hora')));
+        if (h == null) k.error = 'Indicá a qué hora terminaste.';
+        else if (h <= j.entrada || h > rel) k.error = 'La hora tiene que estar entre tu entrada y ahora.';
+        else datos = { conf: false, decl: { tipo: 'olvido', hora: h, texto: '' } };
+      } else k.error = 'Elegí qué pasó con el tiempo de más.';
+    } else if (k.otras) {
+      const t = String(d.cierreTexto || '').trim();
+      if (!t) k.error = 'Contanos qué fue distinto o volvé a confirmar tus horas.';
+      else datos = { conf: false, decl: { tipo: 'otras', hora: null, texto: t.slice(0, 200) } };
+    } else if (!k.ok) k.error = 'Confirmá tus horas antes de cerrar.';
+    else datos = { conf: true, decl: null };
+    if (datos) {
+      const jc = cerrarJornada(S, j.id, datos);
+      S.ui.cierre = null; S.ui.arriba = true;
+      if (jc) { S.ui.festejo = jc.id; S.ui.recien = jc.id; }
+    }
+  }
+  else if (tipo === 'olvido') {
+    const err = declararOlvido(S, f.dataset.j, aMin(val('olvido-hora')));
+    S.ui.errores.olvido = err;
+    if (!err) aviso('Enviado. Tu supervisor lo va a revisar.');
+  }
+  else if (tipo === 'descargo') {
+    const err = enviarDescargo(S, f.dataset.j, d.descargo);
+    S.ui.errores.descargo = err;
+    if (!err) { S.ui.descargo = null; d.descargo = ''; aviso('Enviado a tu supervisor. Gracias por avisar.'); }
+  }
+  else if (tipo === 'novedad') {
+    const archivo = $('#nov-foto');
+    const foto = archivo && archivo.files && archivo.files[0] ? archivo.files[0].name : '';
+    const err = agregarNovedad(S, c.id, { tipo: d.novTipo || 'insumos', crit: d.novCrit || 'media', texto: d.novTexto, foto: foto, sede: val('nov-sede') });
+    S.ui.errores.nov = err;
+    if (!err) { d.novTexto = ''; aviso('Novedad enviada. Gracias por avisar.'); }
+  }
+  else if (tipo === 'resolver') {
+    const id = f.dataset.j, marcado = f.querySelector('input[type="radio"]:checked'), j = porId(S, id);
+    const que = marcado ? marcado.value : '', hora = aMin(val('val-' + id));
+    const err = resolver(S, id, que, hora);
+    if (err) S.ui.casos[id] = { que: que, hora: j ? aRel(j, hora) : null, error: err };
+    else { delete S.ui.casos[id]; aviso('Resuelto. ' + cap(S.bitacora[0].texto) + '.'); }
+  }
+  else if (tipo === 'justificar') {
+    const err = justificar(S, f.dataset.j, val('mot-' + f.dataset.j));
+    aviso(err || cap(S.bitacora[0].texto) + '.');
+  }
+  else if (tipo === 'asig') {
+    const colabId = val('as-colab'), antes = S.avisos.length;
+    const err = agregarAsig(S, { colab: colabId, nombre: val('as-nombre'), sede: val('as-sede'), dias: borradorDias('asigDias', [1, 2, 3, 4, 5]), ti: val('as-ti'), tf: val('as-tf'), modalidad: val('as-mod'), valor: val('as-valor'), desde: val('as-desde'), hasta: val('as-hasta') });
+    S.ui.errores.asig = err;
+    if (!err) {
+      limpiar(['asigColab', 'asigNombre', 'asigSede', 'asigDias', 'asigTi', 'asigTf', 'asigMod', 'asigValor', 'asigDesde', 'asigHasta']);
+      aviso((colabId === 'nuevo' ? 'Colaborador agregado con su asignación.' : 'Asignación agregada.') + (S.avisos.length > antes ? ' Supera el tope diario: supervisión ya tiene el aviso.' : ''));
+    }
+  }
+  else if (tipo === 'franja') {
+    const err = agregarFranja(S, { sede: S.ui.sedeGrilla, dias: borradorDias('frDias', SEMANA), ti: val('nf-ti'), tf: val('nf-tf'), dot: val('nf-dot') });
+    S.ui.errores.franja = err;
+    if (!err) { limpiar(['frDias', 'frTi', 'frTf', 'frDot']); aviso('Franja contratada agregada.'); }
+  }
+  else if (tipo === 'licencia') {
+    const err = agregarLicencia(S, { colab: val('li-colab'), tipo: val('li-tipo'), desde: val('li-desde'), hasta: val('li-hasta') });
+    S.ui.errores.licencia = err;
+    if (!err) { limpiar(['licColab', 'licTipo', 'licDesde', 'licHasta']); tick(S); aviso('Ausencia cargada. La grilla ya muestra las franjas que quedan sin cubrir.'); }
+  }
+  else if (tipo === 'feriado') {
+    const err = agregarFeriado(S, { f: val('fe-f'), nombre: val('fe-nombre'), tipo: val('fe-tipo') });
+    S.ui.errores.feriado = err;
+    if (!err) { limpiar(['ferF', 'ferNombre', 'ferTipo']); aviso('Fecha agregada al calendario.'); }
+  }
+  render();
+});
+
+window.addEventListener('hashchange', render);
+
+/* ---------- Arranque ---------- */
+
+function arrancar(previo) {
+  S = valido(previo) ? previo : (cargar() || sembrar());
+  if (!S.ui.errores) S.ui.errores = {};
+  if (!S.ui.drafts) S.ui.drafts = {};
+  if (!S.ui.casos) S.ui.casos = {};
+  if (!S.ui.semana) S.ui.semana = lunesDe(S.hoy);
+  colabSel(S);
+  render();
+}
+if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => S);
+if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(arrancar);
+else arrancar((window.claude && window.claude.hot && window.claude.hot.data) || null);
+
+/* Solo en el sitio publicado: instalación en el teléfono y funcionamiento sin conexión. */
+(function () {
+  const CLAVE_NO = 'plataforma-instalar-no';
+  const caja = document.getElementById('instalar');
+  const texto = document.getElementById('instalar-texto');
+  const si = document.getElementById('instalar-si');
+  const no = document.getElementById('instalar-no');
+  let pedido = null;
+  const instalada = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+  const descartado = () => { try { return localStorage.getItem(CLAVE_NO) === '1'; } catch (e) { return false; } };
+  function mostrar(modo) {
+    if (!caja || instalada() || descartado()) return;
+    if (modo === 'android') {
+      texto.textContent = 'Podés instalarla en este teléfono y abrirla desde su ícono, como cualquier aplicación.';
+      si.hidden = false;
+      no.textContent = 'Ahora no';
+    } else {
+      texto.textContent = modo === 'ios'
+        ? 'Para instalarla en el iPhone, tocá Compartir y elegí Agregar a inicio.'
+        : 'Para instalarla en el iPhone, abrila en Safari, tocá Compartir y elegí Agregar a inicio.';
+      si.hidden = true;
+      no.textContent = 'Entendido';
+    }
+    caja.hidden = false;
+  }
+  function ocultar(recordar) {
+    if (caja) caja.hidden = true;
+    if (recordar) { try { localStorage.setItem(CLAVE_NO, '1'); } catch (e) { /* sin almacenamiento, vuelve a aparecer la próxima vez */ } }
+  }
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); pedido = e; mostrar('android'); });
+  window.addEventListener('appinstalled', () => { pedido = null; ocultar(false); });
+  if (si) si.addEventListener('click', () => {
+    if (!pedido) return;
+    pedido.prompt();
+    pedido.userChoice.then(() => { pedido = null; ocultar(false); }).catch(() => { /* la persona cerró el cuadro */ });
+  });
+  if (no) no.addEventListener('click', () => ocultar(true));
+  const ua = navigator.userAgent || '';
+  const esIos = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (esIos) mostrar(/safari/i.test(ua) && !/crios|fxios|edgios/i.test(ua) ? 'ios' : 'ios-otro');
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => { /* sin service worker la web funciona igual, pero necesita conexión */ });
+    });
+  }
+})();
+
+</script>
+</body>
+</html>

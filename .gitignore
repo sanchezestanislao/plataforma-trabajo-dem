@@ -1,0 +1,8 @@
+# Versión de un solo archivo para el artefacto de Claude: se genera con armar.py
+/index.html
+# Capturas de las pruebas
+/capturas/
+/capturas-sitio/
+node_modules/
+__pycache__/
+.DS_Store

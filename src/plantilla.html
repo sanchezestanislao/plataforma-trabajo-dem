@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prototipo de fichaje y jornadas</title>
+<!--CABEZA-->
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/*ESTILOS*/
+</style>
+</head>
+<body>
+<header class="barra">
+  <div class="marca"><strong>Plataforma de trabajo</strong><span>Prototipo con datos de ejemplo</span></div>
+  <nav class="roles" aria-label="Vistas del prototipo">
+    <a href="#colaborador">Colaborador</a>
+    <a href="#supervisor">Supervisor</a>
+    <a href="#administracion">Administración</a>
+  </nav>
+</header>
+<section class="reloj" aria-label="Reloj de la demo">
+  <span class="reloj-cuando"><span class="reloj-titulo">Reloj de la demo</span><span class="reloj-fecha" id="reloj-fecha"></span></span>
+  <label class="oculto" for="reloj-hora">Hora simulada</label>
+  <input type="time" id="reloj-hora">
+  <button class="btn-r" type="button" data-a="mas" data-min="15" id="reloj-15">Sumar 15 min</button>
+  <button class="btn-r" type="button" data-a="mas" data-min="60" id="reloj-60">Sumar 1 h</button>
+  <button class="btn-r empuja" type="button" data-a="dia" id="reloj-dia">Pasar al día siguiente</button>
+  <button class="btn-r" type="button" data-a="reiniciar" id="reloj-reiniciar">Reiniciar demo</button>
+</section>
+<!--INSTALAR-->
+<main id="vista"></main>
+<div id="aviso" role="status" aria-live="polite"></div>
+<script>
+/*LOGICA*/
+/*VISTAS*/
+/*SITIO*/
+</script>
+</body>
+</html>
