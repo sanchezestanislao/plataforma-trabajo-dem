@@ -804,30 +804,229 @@ function adminReglas() {
       '</div></section>';
 }
 
-function adminLiquidacion() {
-  const mes = mesDe(S.hoy);
-  let total = 0, filas = '';
-  for (const c of S.colabs) {
-    let sub = 0, cuantas = 0;
-    for (const a of asigsDe(S, c.id)) {
-      const r = resumenAsig(S, a.id, mes);
-      if (!r.jornadas && !r.justificada) continue;
-      const base = baseAsig(S, a, r), rec = recargoFeriado(S, a, r), fer = r.fer.feriado + r.fer.no_laborable;
-      sub += base; cuantas++;
-      const chips = [['verde', r.verde], ['estrella', r.estrella], ['amarillo', r.amarillo], ['rojo', r.rojo], ['revision', r.revision]].filter(x => x[1] > 0).map(x => chip(x[0], x[1])).join('');
-      const rev = r.enRevision || r.sinSalida ? [r.enRevision ? dur(r.enRevision) : '', r.sinSalida ? r.sinSalida + ' sin salida' : ''].filter(Boolean).join(', ') : 'Nada';
-      const celFer = (r.fer.feriado ? dur(r.fer.feriado) : 'Nada') + (r.fer.no_laborable ? '<span class="sub">no&nbsp;laborable: ' + nb(dur(r.fer.no_laborable)) + '</span>' : '');
-      const notaFer = a.modalidad === 'hora' ? (rec ? '<span class="sub">incluye&nbsp;' + ARS.format(rec) + ' por&nbsp;feriado</span>' : '') : fer ? '<span class="sub">feriado según&nbsp;convenio</span>' : '';
-      filas += '<tr><td><span class="nombre">' + esc(nombreCompleto(c)) + '</span><span class="sub">' + esc(sedeNombre(S, a.sede)) + ', ' + modTexto(a.modalidad).toLowerCase() + '</span></td><td><span class="chips">' + chips + '</span></td>' +
-        '<td class="num">' + dur(r.asignadas) + '</td><td class="num">' + dur(r.normales) + '</td><td class="num">' + celFer + '</td><td class="num">' + (r.extra ? dur(r.extra) : 'Nada') + '</td><td class="num">' + rev + '</td><td class="num">' + r.inasistencias + '</td><td class="num"><strong>' + ARS.format(base) + '</strong>' + notaFer + '</td></tr>';
-    }
-    if (cuantas > 1) filas += '<tr class="subtotal"><td colspan="8">Total de ' + esc(nombreCompleto(c)) + ', ' + cuantas + ' asignaciones</td><td class="num"><strong>' + ARS.format(sub) + '</strong></td></tr>';
-    total += sub;
+/* ---------- Preliquidación: lo previsto del mes contra lo cumplido ---------- */
+
+/* Porcentaje para mostrar: no dice 100 si todavía falta algo, ni 0 si ya hay algo. */
+function porc(x) {
+  const n = Math.round(x * 100);
+  return (x > 0 && n < 1 ? 1 : x < 1 && n > 99 ? 99 : n) + ' %';
+}
+function cuantos(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
+/* Una duración con las horas separadas de a miles, para los totales: 1.092 h. */
+function durTotal(min) { return dur(min).replace(/^\d{4,}/, n => n.replace(/\B(?=(\d{3})+$)/g, '.')); }
+function mesLiq() { return mesesLiquidables(S).indexOf(S.ui.mesLiq) >= 0 ? S.ui.mesLiq : mesDe(S.hoy); }
+/* La barra: lo cumplido sobre lo previsto del mes. Mientras el mes corre, la marca señala dónde debería ir con los turnos ya cerrados. */
+function barraAvance(t, enCurso, grande) {
+  const p = x => Math.max(0, Math.min(100, Math.round(x * 1000) / 10));
+  const dice = 'Cumplido ' + porc(t.avance) + ' de lo previsto para el mes' + (enCurso ? '. Con los turnos ya cerrados debería ir en ' + porc(t.esperado) : '') + '.';
+  return '<span class="avance' + (grande ? ' grande' : '') + '" role="img" aria-label="' + dice + '" title="' + dice + '"><span class="av-pista">' +
+    (enCurso ? '<span class="av-esp" style="width:' + p(t.esperado) + '%"></span>' : '') + '<span class="av-hecho" style="width:' + p(t.avance) + '%"></span></span>' +
+    (enCurso && t.esperado > 0 ? '<span class="av-marca" style="left:' + p(t.esperado) + '%"></span>' : '') + '</span>';
+}
+function avanceCelda(t, enCurso) {
+  const pie = '<strong>' + nb(porc(t.avance)) + '</strong>' + (enCurso && (t.cerrados || t.impHoy) ? '<span class="sub">' + nb('debería ir en ' + porc(t.esperado)) + '</span>' : '');
+  return barraAvance(t, enCurso) + '<span class="av-pie">' + pie + '</span>';
+}
+function desviosHtml(v) {
+  const ps = v.desvios.map(d => {
+    if (d.tipo === 'falta') return '<span class="pill ' + (d.grave ? 'crit-alta' : 'crit-media') + '">Faltan ' + dur(d.min) + '</span>' + (d.inasistencias ? '<span class="sub">' + cuantos(d.inasistencias, 'inasistencia', 'inasistencias') + '</span>' : '');
+    if (d.tipo === 'extra') return '<span class="pill">Extra: ' + dur(d.min) + '</span>';
+    const que = [d.min ? dur(d.min) + ' de más' : '', d.sinSalida ? d.sinSalida + ' sin salida' : ''].filter(Boolean).join(' y ');
+    return '<span class="pill est-en_curso">En revisión: ' + (que || cuantos(d.turnos, 'turno', 'turnos')) + '</span>';
+  }).join('');
+  if (ps) return '<span class="desvios">' + ps + '</span>';
+  return v.cerrados ? '<span class="pill est-resuelta">Al día</span>' : '<span class="sub">Sin turnos cerrados</span>';
+}
+function situacionTexto(v) {
+  if (!v.desvios.length) return v.cerrados ? 'Al día' : 'Sin turnos cerrados';
+  return cap(v.desvios.map(d => d.tipo === 'falta' ? 'por debajo' : d.tipo === 'extra' ? 'con horas extra' : 'con turnos en revisión').join(', '));
+}
+function quienLiq(c, a) {
+  return '<span class="nombre">' + esc(nombreCompleto(c)) + '</span><span class="sub">' + esc(sedeNombre(S, a.sede)) + ', ' + modTexto(a.modalidad).toLowerCase() + '</span><span class="sub">' + ARS.format(a.valor) + (a.modalidad === 'hora' ? ' la hora' : ' al mes') + '</span>';
+}
+/* Horas en feriado y en día no laborable de una asignación, y qué pasa con ellas: por hora suman recargo; lo fijo va según convenio. */
+function feriadoLiq(a, fer) {
+  const rec = recargoDe(S, a, fer);
+  return (fer.feriado ? dur(fer.feriado) : 'Nada') + (fer.no_laborable ? '<span class="sub">no&nbsp;laborable: ' + nb(dur(fer.no_laborable)) + '</span>' : '') +
+    (a.modalidad === 'hora' ? (rec ? '<span class="sub">incluye&nbsp;' + ARS.format(rec) + ' por&nbsp;feriado</span>' : '') : fer.feriado + fer.no_laborable ? '<span class="sub">feriado según&nbsp;convenio</span>' : '');
+}
+function filaLiq(c, v, enCurso) {
+  const a = v.a, r = v.r;
+  const chips = [['verde', r.verde], ['estrella', r.estrella], ['amarillo', r.amarillo], ['rojo', r.rojo], ['revision', r.revision]].filter(x => x[1] > 0).map(x => chip(x[0], x[1])).join('');
+  return '<tr><td>' + quienLiq(c, a) + '</td>' +
+    '<td class="num"><strong>' + ARS.format(v.impMes) + '</strong><span class="sub">' + nb(dur(v.prev) + ' en ' + cuantos(v.turnos, 'turno', 'turnos')) + '</span>' +
+      (v.parcial ? '<span class="sub">' + nb('por parte del mes') + '</span>' : '') + (v.justificados ? '<span class="sub">' + nb(cuantos(v.justificados, 'justificado', 'justificados')) + '</span>' : '') + '</td>' +
+    '<td class="c-avance">' + avanceCelda(v, enCurso) + '</td>' +
+    '<td class="num"><strong>' + ARS.format(v.impCumplido) + '</strong><span class="sub">' + nb(v.cerrados ? dur(v.cumplido) + ' de ' + dur(v.prevHoy) : 'Nada todavía') + '</span></td>' +
+    '<td class="num">' + feriadoLiq(a, r.fer) + '</td>' +
+    '<td>' + desviosHtml(v) + '</td>' +
+    '<td><span class="chips">' + chips + '</span></td></tr>';
+}
+/* El mes que viene todavía no empezó: de cada asignación se muestra solo lo previsto. */
+function filaPrevista(c, v) {
+  return '<tr><td>' + quienLiq(c, v.a) + '</td>' +
+    '<td class="num"><strong>' + ARS.format(v.impMes) + '</strong>' + (v.parcial ? '<span class="sub">' + nb('por parte del mes') + '</span>' : '') + '</td>' +
+    '<td class="num">' + nb(dur(v.prev)) + '<span class="sub">' + nb(cuantos(v.turnos, 'turno', 'turnos')) + '</span></td>' +
+    '<td class="num">' + feriadoLiq(v.a, v.fer) + '</td>' +
+    '<td class="num">' + (v.justificados ? nb(cuantos(v.justificados, 'turno', 'turnos')) : 'Ninguna') + '</td></tr>';
+}
+function totalPrevisto(clase, texto, t) {
+  return '<tr' + (clase ? ' class="' + clase + '"' : '') + '><td>' + texto + '</td><td class="num"><strong>' + ARS.format(t.impMes) + '</strong></td><td class="num">' + nb(durTotal(t.prev)) + '<span class="sub">' + nb(cuantos(t.turnos, 'turno', 'turnos')) + '</span></td><td colspan="2"></td></tr>';
+}
+function totalLiq(clase, texto, t, enCurso) {
+  return '<tr' + (clase ? ' class="' + clase + '"' : '') + '><td>' + texto + '</td><td class="num"><strong>' + ARS.format(t.impMes) + '</strong></td><td class="c-avance">' + avanceCelda(t, enCurso) + '</td>' +
+    '<td class="num"><strong>' + ARS.format(t.impCumplido) + '</strong></td><td colspan="3"></td></tr>';
+}
+function resumenLiq(P) {
+  const t = P.total, sinCumplir = (P.enCurso ? t.impHoy : t.impMes) - t.impCumplido;
+  const cifra = (titulo, valor, sub) => '<div><p class="cifra-t">' + titulo + '</p><p class="cifra">' + valor + '</p><p class="sub">' + sub + '</p></div>';
+  if (P.futuro) {
+    let recargo = 0;
+    for (const p of P.personas) for (const v of p.lineas) recargo += recargoDe(S, v.a, v.fer);
+    return '<div class="panel liq-resumen"><div class="cifras">' +
+        cifra('Previsto del mes', ARS.format(t.impMes), durTotal(t.prev) + ' en ' + cuantos(t.turnos, 'turno', 'turnos')) +
+        cifra('Recargo por feriados', ARS.format(recargo), recargo ? 'Ya está incluido en lo previsto' : 'Ningún turno por hora cae en feriado con recargo') +
+        cifra('Equipo', cuantos(P.personas.length, 'persona', 'personas'), cuantos(t.lineas, 'asignación', 'asignaciones') + ' con turnos en el mes') +
+      '</div><p class="liq-pie">Es lo que le tocaría cobrar al equipo si se cumplen todos los turnos.</p></div>';
   }
-  return '<section class="seccion"><h2>Preliquidación de ' + nombreMes(S.hoy) + '</h2><p class="bajada">Turnos cerrados hasta el ' + fechaLarga(S.hoy) + ', una línea por asignación. Las horas en feriado y en día no laborable se cuentan aparte: en las asignaciones por hora suman el recargo definido en Feriados, y en las fijas quedan según convenio.</p>' +
-    '<div class="panel"><div class="tabla-wrap"><table class="tabla-liq"><thead><tr><th>Colaborador y asignación</th><th>Semáforo del mes</th><th class="num">Horas asignadas</th><th class="num">Horas validadas</th><th class="num">En feriado</th><th class="num">Extra verificadas</th><th class="num">En revisión</th><th class="num">Inasistencias</th><th class="num">Base estimada</th></tr></thead><tbody>' + filas + '</tbody>' +
-    '<tfoot><tr><td colspan="8">Base estimada del equipo</td><td class="num"><strong>' + ARS.format(total) + '</strong></td></tr></tfoot></table></div>' +
-    '<p class="pie-tabla">' + (REAL ? '' : 'Valores de ejemplo. ') + 'La base de una asignación por hora son sus horas validadas por el valor hora, más el recargo de feriado. La de una fija es su monto mensual: su liquidación va según convenio y queda para definir. Tampoco suman todavía la hora extra ni el descuento por inasistencia, que figuran aparte.</p></div></section>';
+  const notas = [
+    t.debajo ? '<span class="pill crit-media">' + cuantos(t.debajo, 'asignación por debajo', 'asignaciones por debajo') + '</span>' : '',
+    t.conExtra ? '<span class="pill">' + t.conExtra + ' con horas extra</span>' : '',
+    t.aRevisar ? '<span class="pill est-en_curso">' + t.aRevisar + ' con turnos en revisión</span>' : ''
+  ].filter(Boolean).join('');
+  return '<div class="panel liq-resumen"><div class="cifras">' +
+      cifra('Previsto del mes', ARS.format(t.impMes), durTotal(t.prev) + ' en ' + cuantos(t.turnos, 'turno', 'turnos')) +
+      cifra(P.enCurso ? 'Cumplido hasta hoy' : 'Cumplido', ARS.format(t.impCumplido), t.cerrados ? durTotal(t.cumplido) + ' cumplidas de ' + durTotal(t.prevHoy) : 'Todavía no cerró ningún turno') +
+      (P.enCurso
+        ? cifra('Previsto a hoy', ARS.format(t.impHoy), t.cerrados ? cuantos(t.cerrados, 'turno cerrado', 'turnos cerrados') + (sinCumplir > 0 ? ', ' + ARS.format(sinCumplir) + ' sin cumplir' : '') : 'Empieza a contar cuando cierra el primer turno')
+        : cifra('Sin cumplir', ARS.format(sinCumplir), durTotal(t.falta) + ' de los turnos del mes')) +
+    '</div>' + barraAvance(t, P.enCurso, true) +
+    '<p class="liq-pie"><strong>' + porc(t.avance) + '</strong> de lo previsto para el mes ' + (P.enCurso ? 'ya está cumplido.' : 'quedó cumplido.') + (P.enCurso && t.cerrados ? ' La marca muestra dónde debería ir con los turnos ya cerrados: ' + porc(t.esperado) + '.' : '') + '</p>' +
+    (notas ? '<p class="liq-notas">' + notas + '</p>' : '') + '</div>';
+}
+function adminLiquidacion() {
+  const ms = mesesLiquidables(S), mes = mesLiq(), actual = mesDe(S.hoy), P = preliquidacion(S, mes), t = P.total, nombre = nombreMes(mes + '-01');
+  let filas = '';
+  for (const p of P.personas) {
+    for (const v of p.lineas) filas += P.futuro ? filaPrevista(p.c, v) : filaLiq(p.c, v, P.enCurso);
+    if (p.lineas.length > 1) {
+      const texto = 'Total de ' + esc(nombreCompleto(p.c)) + ', ' + p.lineas.length + ' asignaciones';
+      filas += P.futuro ? totalPrevisto('subtotal', texto, p.total) : totalLiq('subtotal', texto, p.total, P.enCurso);
+    }
+  }
+  const selector = '<div class="sedes-sel">' + ms.map(m => '<button type="button" data-a="liq-mes" data-mes="' + m + '" id="lm-' + m + '"' + (m === mes ? ' aria-current="true"' : '') + '><b>' + cap(nombreMes(m + '-01')) + '</b><span>' + (m === actual ? 'Mes en curso' : m < actual ? 'Mes cerrado' : 'Mes que viene') + '</span></button>').join('') + '</div>';
+  const bajada = P.futuro
+    ? 'Estimación del mes que viene: lo que le toca a cada asignación si se cumplen todos sus turnos, con los horarios, las ausencias y los feriados cargados hoy. Se actualiza sola cuando cambiás una asignación.'
+    : P.enCurso
+      ? 'Lo previsto sale de las asignaciones: los turnos del mes, por su valor. A medida que los turnos se cierran, el avance muestra cuánto ya se cumplió y dónde hay desvíos para corregir. Cuenta los turnos cerrados hasta el ' + fechaLarga(S.hoy) + '.'
+      : 'Mes cerrado. Lo previsto son los turnos que le tocaron a cada asignación, y lo cumplido, sus horas validadas. Lo que siga en revisión se resuelve desde Supervisión.';
+  const cabeza = '<h2>Preliquidación de ' + nombre + '</h2><p class="bajada">' + bajada + '</p>';
+  if (!t.lineas) {
+    return '<section class="seccion">' + cabeza + '<div class="liq-barra">' + selector + '</div>' +
+      '<p class="panel vacio">' + (P.enCurso || P.futuro ? 'Todavía no hay turnos previstos para ' + nombre + '. Cuando cargues una asignación, acá aparece lo que le toca cobrar en el mes.' : 'No quedaron turnos de ' + nombre + '.') + '</p></section>';
+  }
+  const ejemplo = REAL ? '' : 'Valores de ejemplo. ';
+  const tabla = P.futuro
+    ? '<table class="tabla-liq"><thead><tr><th>Colaborador y asignación</th><th class="num">Previsto del mes</th><th class="num">Horas y turnos</th><th class="num">En feriado</th><th class="num">Ausencias cargadas</th></tr></thead><tbody>' + filas + '</tbody>' +
+      '<tfoot>' + totalPrevisto('', 'Total del equipo', t) + '</tfoot></table>'
+    : '<table class="tabla-liq"><thead><tr><th>Colaborador y asignación</th><th class="num">Previsto del mes</th><th>Avance</th><th class="num">Cumplido</th><th class="num">En feriado</th><th>Desvíos</th><th>Semáforo del mes</th></tr></thead><tbody>' + filas + '</tbody>' +
+      '<tfoot>' + totalLiq('', 'Total del equipo', t, P.enCurso) + '</tfoot></table>';
+  const pie = P.futuro
+    ? ejemplo + 'Por hora: los turnos del mes por el valor hora, más el recargo de feriado. Fijo: el monto mensual, o la parte que le toca si la asignación no cubre todo el mes. Las ausencias cargadas no se esperan: por hora salen de lo previsto, y lo fijo no cambia.'
+    : ejemplo + 'Por hora: lo previsto son los turnos del mes por el valor hora, más el recargo de feriado. Fijo: lo previsto es el monto mensual, o la parte que le toca si la asignación no cubre todo el mes; su avance sirve de control, y la liquidación va según convenio. Lo cumplido son las horas validadas de los turnos cerrados, sin descontar los minutos dentro de la tolerancia: un turno en verde cuenta completo. Los turnos justificados no cuentan como faltante. La hora extra y el descuento por inasistencia todavía no suman ni restan importe: figuran en Desvíos. La planilla trae estos datos, el detalle turno por turno y una columna para cargar ajustes.';
+  return '<section class="seccion">' + cabeza +
+    '<div class="liq-barra">' + selector + '<button class="btn primario" type="button" data-a="liq-planilla" id="btn-planilla">Descargar planilla de Excel</button></div>' +
+    resumenLiq(P) +
+    '<div class="panel"><div class="tabla-wrap">' + tabla + '</div><p class="pie-tabla">' + pie + '</p></div></section>';
+}
+
+/* La planilla de Excel de la preliquidación: el resumen por asignación con una columna para ajustar, el detalle turno por turno y las referencias. */
+function planillaLiquidacion(P) {
+  const h2 = min => Math.round(min / 60 * 100) / 100, dec = min => ({ v: h2(min), e: 'dec' }), ent = n => ({ v: n, e: 'entero' });
+  const cols = [
+    ['colab', 'Colaborador', 26], ['sede', 'Sede', 22], ['mod', 'Modalidad', 11], ['valor', 'Valor por hora o por mes ($)', 14],
+    ['turnos', 'Turnos previstos del mes', 10], ['hPrev', 'Horas previstas del mes', 11], ['iPrev', 'Importe previsto del mes ($)', 15],
+    ['cerr', 'Turnos cerrados', 9], ['hHoy', 'Horas previstas a la fecha', 11], ['hCum', 'Horas cumplidas', 11], ['hFalta', 'Horas que faltan', 10],
+    ['inas', 'Inasistencias', 12], ['just', 'Turnos justificados', 11], ['hFer', 'Horas en feriado', 10], ['hNoLab', 'Horas en día no laborable', 11],
+    ['rec', 'Recargo por feriado, ya incluido ($)', 14], ['iCum', 'Importe cumplido ($)', 15], ['av', 'Avance del mes', 9], ['cumpl', 'Cumplimiento a la fecha', 13],
+    ['hExtra', 'Horas extra verificadas', 10], ['hRev', 'Horas en revisión', 10], ['sinSal', 'Turnos sin salida', 9], ['sit', 'Situación', 46],
+    ['ajuste', 'Ajuste ($)', 13], ['liquidar', 'A liquidar ($)', 15]
+  ];
+  const L = {};
+  cols.forEach((c, i) => { L[c[0]] = columna(i); });
+  const razon = (arriba, abajo, n) => 'IF(' + L[abajo] + n + '=0,0,' + L[arriba] + n + '/' + L[abajo] + n + ')';
+  const resumen = [cols.map(c => ({ v: c[1], e: 'titulo' }))];
+  for (const p of P.personas) for (const v of p.lineas) {
+    const n = resumen.length + 1, r = v.r, a = v.a;
+    const f = {
+      colab: nombreCompleto(p.c), sede: sedeNombre(S, a.sede), mod: modTexto(a.modalidad), valor: ent(a.valor),
+      turnos: v.turnos, hPrev: dec(v.prev), iPrev: ent(v.impMes), cerr: v.cerrados, hHoy: dec(v.prevHoy), hCum: dec(v.cumplido),
+      hFalta: { v: Math.round((h2(v.prevHoy) - h2(v.cumplido)) * 100) / 100, e: 'dec', f: L.hHoy + n + '-' + L.hCum + n },
+      inas: r.inasistencias, just: v.justificados, hFer: dec(r.fer.feriado), hNoLab: dec(r.fer.no_laborable), rec: ent(recargoFeriado(S, a, r)), iCum: ent(v.impCumplido),
+      av: { v: v.avance, e: 'pct', f: razon('iCum', 'iPrev', n) }, cumpl: { v: v.prevHoy ? v.cumplido / v.prevHoy : 0, e: 'pct', f: razon('hCum', 'hHoy', n) },
+      hExtra: dec(r.extra), hRev: dec(r.enRevision), sinSal: r.sinSalida, sit: situacionTexto(v),
+      ajuste: { v: null, e: 'ajuste' }, liquidar: { v: v.impCumplido, e: 'entero', f: L.iCum + n + '+' + L.ajuste + n }
+    };
+    resumen.push(cols.map(c => f[c[0]]));
+  }
+  const ult = resumen.length, nt = ult + 1, t = P.total;
+  const suma = (k, e) => ({ v: resumen.slice(1).reduce((s, fila) => { const c = fila[cols.findIndex(x => x[0] === k)]; return s + (c && typeof c === 'object' ? c.v || 0 : c || 0); }, 0), e: e, f: 'SUM(' + L[k] + '2:' + L[k] + ult + ')' });
+  const tot = { colab: { v: 'Total del equipo', e: 'total' }, av: { v: t.avance, e: 'totalPct', f: razon('iCum', 'iPrev', nt) }, cumpl: { v: t.prevHoy ? t.cumplido / t.prevHoy : 0, e: 'totalPct', f: razon('hCum', 'hHoy', nt) } };
+  for (const k of ['turnos', 'cerr', 'inas', 'just', 'sinSal', 'iPrev', 'rec', 'iCum', 'ajuste', 'liquidar']) tot[k] = suma(k, 'totalEntero');
+  for (const k of ['hPrev', 'hHoy', 'hCum', 'hFalta', 'hFer', 'hNoLab', 'hExtra', 'hRev']) tot[k] = suma(k, 'totalDec');
+  resumen.push(cols.map(c => tot[c[0]] || { v: null, e: 'total' }));
+
+  const colsT = [['Fecha', 12], ['Día', 11], ['Colaborador', 26], ['Sede', 22], ['Modalidad', 11], ['Entrada prevista', 9], ['Salida prevista', 9], ['Entrada', 9], ['Salida', 9], ['Salida validada', 10],
+    ['Horas previstas', 10], ['Horas cumplidas', 10], ['Horas extra verificadas', 10], ['Horas en revisión', 10], ['Semáforo', 13], ['Detalle', 38], ['Feriado', 32], ['Entrada por', 24], ['Salida por', 24]];
+  const hm0 = m => (m == null ? null : { v: m, e: 'hora' }), turnos = [];
+  for (const p of P.personas) for (const v of p.lineas) {
+    const quien = nombreCompleto(p.c), mod = modTexto(v.a.modalidad);
+    const linea = (f, sede, ti, tf, resto) => { const x = feriadoEl(S, f); return { f: f, quien: quien, ti: ti, fila: [{ v: f, e: 'fecha' }, cap(DIAS[diaSemana(f)]), quien, sedeNombre(S, sede), mod, hm0(ti), hm0(tf)].concat(resto.slice(0, 9), [x ? x.nombre : null], resto.slice(9)) }; };
+    for (const j of S.jornadas) {
+      if (j.a !== v.a.id || mesDe(j.f) !== P.mes) continue;
+      const e = ev(S, j), hecho = j.cerrada && !j.justif;
+      turnos.push(linea(j.f, j.sede, j.ti, j.tf, [hm0(j.entrada), hm0(j.salida), j.rev ? hm0(j.salidaVal) : null, j.justif ? null : dec(j.tf - j.ti), hecho ? dec(acreditado(j, e, S.P).min) : null,
+        e.extra ? dec(e.extra) : null, e.enRevision ? dec(e.enRevision) : null, NOMBRE_ESTADO[e.estado] || '', e.detalle, j.metodoIn ? cap(METODO[j.metodoIn] || '') : null, j.metodoOut ? cap(METODO[j.metodoOut] || '') : null]));
+    }
+    for (const x of v.porVenir) turnos.push(linea(x.f, v.a.sede, x.ti, x.tf, [null, null, null, x.lic ? null : dec(x.tf - x.ti), null, null, null, x.lic ? 'Justificada' : 'Por venir', x.lic ? TIPOS_LIC[x.lic] + ' cargada' : 'Según la asignación de hoy', null, null]));
+  }
+  turnos.sort((a, b) => (a.f < b.f ? -1 : a.f > b.f ? 1 : a.quien < b.quien ? -1 : a.quien > b.quien ? 1 : a.ti - b.ti));
+
+  const anio = P.mes.slice(0, 4), cuando = fechaMedia(S.hoy) + ' de ' + S.hoy.slice(0, 4) + ', ' + hm(S.ahora);
+  const N = t0 => ({ v: t0, e: 'nota' }), B = t0 => ({ v: t0, e: 'negrita' });
+  const refs = [
+    [B('Preliquidación de ' + nombreMes(P.mes + '-01') + ' de ' + anio)],
+    [N('Estado'), N(P.futuro ? 'Mes que viene. Todavía no empezó: todo es lo previsto con lo cargado hoy.' : P.enCurso ? 'Mes en curso. Cuenta los turnos cerrados hasta el ' + cuando + '.' : 'Mes cerrado.')],
+    [N('Planilla generada'), N('El ' + cuando + '.')],
+    [],
+    [B('Cómo se calcula')],
+    [N('Previsto del mes'), N('Los turnos del mes de cada asignación: los que ya quedaron registrados y, si el mes corre, los que faltan según la asignación de hoy.')],
+    [N('Por hora'), N('Importe: las horas por el valor hora, más el recargo de feriado (' + S.P.recFeriado + ' % en feriado nacional y ' + S.P.recNoLab + ' % en día no laborable).')],
+    [N('Fijo'), N('El importe previsto es el monto mensual, o la parte que le toca si la asignación no cubre todo el mes. El importe cumplido avanza con las horas cumplidas. Sirve de control: la liquidación va según convenio.')],
+    [N('Horas cumplidas'), N('Las horas validadas de los turnos cerrados, dentro del horario del turno y sin descontar los minutos de tolerancia (' + S.P.gracia + ' min al llegar y al salir). Un turno en verde o con estrella cuenta completo.')],
+    [N('Turnos justificados'), N('Licencia, vacaciones, franco o ausencia con aviso. No cuentan como faltante: por hora salen de lo previsto y en lo fijo se dan por cumplidos.')],
+    [N('Horas extra y en revisión'), N('No suman importe. Las extra ya las verificó supervisión. Las que están en revisión esperan que supervisión las resuelva.')],
+    [N('Ajuste y A liquidar'), N('La columna Ajuste viene vacía para cargar sumas o descuentos. A liquidar es el importe cumplido más el ajuste.')],
+    [N('Semáforo'), N('Verde: turno correcto. Amarillo: llegó o salió fuera de la tolerancia de ' + S.P.gracia + ' min. Rojo: inasistencia o demora mayor a ' + S.P.rojo + ' min. Estrella: hora extra verificada.')]
+  ];
+  return [
+    { nombre: 'Preliquidación', anchos: cols.map(c => c[2]), fijas: 1, filtro: ult, apaisada: true, filas: resumen },
+    { nombre: 'Turnos', anchos: colsT.map(c => c[1]), fijas: 1, filtro: true, apaisada: true, filas: [colsT.map(c => ({ v: c[0], e: 'titulo' }))].concat(turnos.map(x => x.fila)) },
+    { nombre: 'Referencias', anchos: [28, 110], filas: refs }
+  ];
+}
+/* Arma la planilla del mes que se está mirando y la baja al equipo. Devuelve el nombre del archivo. */
+function descargarPlanilla() {
+  const P = preliquidacion(S, mesLiq()), p = S.hoy.split('-').map(Number), nombre = 'preliquidacion-' + P.mes + '.xlsx';
+  const bytes = xlsx(planillaLiquidacion(P), { a: p[0], m: p[1], d: p[2], h: Math.floor(S.ahora / 60), mi: S.ahora % 60 });
+  const url = URL.createObjectURL(new Blob([bytes], { type: TIPO_XLSX }));
+  const a = document.createElement('a');
+  a.href = url; a.download = nombre; a.hidden = true;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return nombre;
 }
 
 /* ---------- Dibujo ---------- */
@@ -936,6 +1135,10 @@ document.addEventListener('click', ev0 => {
   else if (a === 'quitar-licencia') { quitarLicencia(S, b.dataset.id); aviso('Ausencia quitada.'); }
   else if (a === 'quitar-feriado') { quitarFeriado(S, b.dataset.f); aviso('Fecha quitada del calendario.'); }
   else if (a === 'sugerido') { ponerParam(S, 'recFeriado', SUGERIDO.recFeriado); ponerParam(S, 'recNoLab', SUGERIDO.recNoLab); aviso('Tratamiento sugerido aplicado.'); }
+  else if (a === 'liq-mes') S.ui.mesLiq = b.dataset.mes;
+  else if (a === 'liq-planilla') {
+    try { aviso('Planilla descargada: ' + descargarPlanilla() + '.'); } catch (e) { aviso('No pudimos armar la planilla. Probá de nuevo.'); }
+  }
   render();
   if (subir) { const g = $('#grilla-seccion'); if (g) { try { g.scrollIntoView({ block: 'start' }); } catch (e) { /* sin desplazamiento */ } } }
 });

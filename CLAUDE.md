@@ -25,6 +25,8 @@ Antes de subir un cambio tienen que pasar las cuatro pruebas de `pruebas/`.
 
 - JavaScript sin framework. La única pieza de terceros es el generador de QR de `src/terceros/`.
 - `src/logica.js`: reglas, datos de ejemplo y acciones, sin tocar el DOM. Se prueba en Node y es la referencia de las reglas.
+- `src/planilla.js`: arma un archivo de Excel (.xlsx) en el navegador, sin librerías: un zip sin comprimir con las
+  partes mínimas. Tampoco toca el DOM. `pruebas/planilla-leer.js` vuelve a leer ese archivo en las pruebas.
 - `src/vistas.js`: dibuja con plantillas y delega los eventos por atributos (`data-a`, `data-form`, `data-draft`).
   `REAL` vale true en el sitio publicado, donde existe `CONFIG`, y false en la demo.
 - `src/real.js`: solo la versión real. Ingreso con DNI, llamadas al servidor, fichaje (código, QR, ubicación y teléfono),
@@ -70,6 +72,15 @@ Antes de subir un cambio tienen que pasar las cuatro pruebas de `pruebas/`.
 - Un turno sin entrada pasa a inasistencia cuando termina. Con entrada y sin salida, el sistema lo cierra solo seis
   horas después del fin del turno y la persona declara a qué hora terminó.
 - El valor de una asignación nueva no trae números de ejemplo: se propone el último cargado para esa modalidad.
+- Preliquidación: una asignación tiene su previsto del mes apenas se carga (sus turnos por su valor: los ya
+  registrados más los que faltan según la asignación de hoy). A medida que los turnos se cierran, el avance compara
+  lo cumplido con lo previsto y marca los desvíos: lo que faltó, la hora extra verificada y lo que espera revisión.
+  Se mira el mes en curso, el cerrado y el que viene, y se descarga en una planilla de Excel con el detalle turno
+  por turno y una columna para ajustes. Los cálculos están en `avanceAsig` y `preliquidacion`, en `src/logica.js`.
+  En uso hasta que el dueño las confirme: los minutos de menos dentro de la tolerancia no se descuentan (un turno en
+  verde cuenta completo); lo fijo avanza con las horas cumplidas y, si la asignación no cubre todo el mes, le toca
+  la parte de ese tramo; un turno justificado no se espera (por hora sale de lo previsto, en lo fijo se da por
+  cumplido); la hora extra figura en horas y no suma importe.
 - La ubicación de una sede se carga pegando el enlace que da Google Maps al tocar Compartir. También se aceptan
   coordenadas, el enlace largo, el código plus y «Usar mi ubicación actual».
 
@@ -91,10 +102,12 @@ Antes de subir un cambio tienen que pasar las cuatro pruebas de `pruebas/`.
 ## Pendiente
 
 - Fotos en las novedades, fichaje sin conexión, lector de QR propio para iPhone (hoy escribe el código o usa la cámara
-  del teléfono), selector de mes y exportación en la preliquidación, carga manual de horas por supervisión.
+  del teléfono), carga manual de horas por supervisión.
+- La preliquidación llega hasta el último mes cerrado: el servidor manda los turnos desde el primer día del mes
+  anterior. Para ver meses más viejos hace falta pedirlos aparte. La planilla va sin comprimir.
 - Supervisión recibe todos los turnos del mes en cada actualización: cuando haya mucho personal conviene mandar solo
   los cambios.
 - Por definir con el dueño: liquidación de lo fijo según convenio, valor de la hora extra, descuento por
-  inasistencia y pago del traslado entre sedes.
+  inasistencia y pago del traslado entre sedes. También, confirmar las reglas de la preliquidación que están en uso.
 - Antes de cargar a todo el personal: consulta legal por el uso de DNI y ubicación, y pasar Supabase a un plan pago
   (el gratuito pausa el proyecto si pasa una semana sin uso).

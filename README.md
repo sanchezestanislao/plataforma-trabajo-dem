@@ -14,7 +14,7 @@ De las mismas fuentes salen dos versiones:
 
 | Carpeta | Contenido |
 | --- | --- |
-| `src/` | Las fuentes: plantilla, estilos, reglas (`logica.js`), pantallas (`vistas.js`), todo lo que habla con el servidor (`real.js`) y lo que hace instalable al sitio (`sitio.js`, `sw.js`, `manifest.webmanifest`, tipografía). |
+| `src/` | Las fuentes: plantilla, estilos, reglas (`logica.js`), la planilla de Excel (`planilla.js`), pantallas (`vistas.js`), todo lo que habla con el servidor (`real.js`) y lo que hace instalable al sitio (`sitio.js`, `sw.js`, `manifest.webmanifest`, tipografía). |
 | `sitio/` | La versión real, lista para publicar. La genera `armar.py`: no se edita a mano. |
 | `supabase/` | La base de datos: `migraciones/` (tablas y funciones, en orden), `pruebas/` y `config.json` (dirección del proyecto y llave pública). En `functions/ubicacion/`, la función que convierte el enlace de Compartir de Google Maps en coordenadas. |
 | `pruebas/` | Pruebas automáticas de las reglas, de la demo, de la versión real y de la instalación, y el servidor de pruebas. |
@@ -88,6 +88,21 @@ En los tres casos el servidor pone la hora y guarda la ubicación del teléfono 
 sede, desde un teléfono que no es el habitual o desde el de otra persona no bloquea: queda en «Fichajes para revisar»
 y supervisión lo da por bueno o lo anula.
 
+## Cómo se lee la preliquidación
+
+- **Previsto del mes**: lo que le toca a cada asignación si cumple todos sus turnos. Sale de los turnos ya
+  registrados más los que faltan según la asignación de hoy, así que aparece apenas se carga un horario.
+- **Avance**: lo cumplido sobre lo previsto. La marca de la barra muestra dónde debería ir con los turnos ya cerrados.
+- **Desvíos**: lo que faltó (inasistencias, llegadas o salidas fuera de la tolerancia), la hora extra verificada y
+  lo que espera revisión de supervisión.
+- Se puede mirar el mes en curso, el cerrado y el que viene. **Descargar planilla de Excel** baja el resumen por
+  asignación con una columna para ajustes, el detalle turno por turno y las referencias.
+
+Por hora, el importe son las horas por el valor hora, más el recargo de feriado. En lo fijo es el monto mensual (o la
+parte que le toca si la asignación no cubre todo el mes) y avanza con las horas cumplidas: sirve de control, la
+liquidación va según convenio. Los minutos de menos dentro de la tolerancia no se descuentan, y la hora extra figura
+en horas, sin importe, hasta que se defina su valor.
+
 ## Seguridad
 
 - Las tablas viven en un esquema que la API no expone. La aplicación solo puede llamar a funciones, y cada función
@@ -105,9 +120,9 @@ y supervisión lo da por bueno o lo anula.
 - Fotos en las novedades.
 - Fichaje sin conexión: hoy, sin señal, la persona pide el fichaje asistido a su supervisor.
 - Lector de QR propio en iPhone: hoy escribe el código de seis números o usa la cámara del teléfono.
-- Selector de mes y exportación en la preliquidación, y carga manual de horas por supervisión.
+- Preliquidación de meses anteriores al último cerrado, y carga manual de horas por supervisión.
 - Definiciones del negocio: liquidación de lo fijo según convenio, valor de la hora extra, descuento por inasistencia
-  y pago del traslado entre sedes.
+  y pago del traslado entre sedes. Y confirmar las reglas de la preliquidación que hoy están en uso.
 
 ## Licencias de terceros
 

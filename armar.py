@@ -114,7 +114,7 @@ def icono(lado, margen, redondeado):
 def armar_demo():
     html = poner(plantilla(False), {
         "<!--CABEZA-->\n": "", "<!--INSTALAR-->\n": "", "<!--GUION-->\n": "", "<!--/GUION-->\n": "",
-        "/*ESTILOS*/": leer("estilos.css"), "/*LOGICA*/": leer("logica.js"), "/*VISTAS*/": leer("vistas.js"),
+        "/*ESTILOS*/": leer("estilos.css"), "/*LOGICA*/": leer("logica.js") + "\n" + leer("planilla.js"), "/*VISTAS*/": leer("vistas.js"),
     })
     (raiz / "index.html").write_text(html, encoding="utf-8")
     return len(html.encode("utf-8"))
@@ -133,7 +133,7 @@ def armar_sitio():
     (sitio / nombre_qr).write_text(qr, encoding="utf-8")
 
     config = {"url": servidor["url"], "clave": servidor["clave"], "qr": nombre_qr}
-    app = "\n".join(["const CONFIG = " + json.dumps(config) + ";", leer("logica.js"), leer("real.js"), leer("vistas.js"), leer("sitio.js")])
+    app = "\n".join(["const CONFIG = " + json.dumps(config) + ";", leer("logica.js"), leer("planilla.js"), leer("real.js"), leer("vistas.js"), leer("sitio.js")])
     nombre_app = "app." + huella(app) + ".js"
     (sitio / nombre_app).write_text(app, encoding="utf-8")
 

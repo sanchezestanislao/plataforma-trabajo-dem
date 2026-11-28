@@ -5,6 +5,7 @@
 const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');
+const { leerPlanilla } = require('./planilla-leer.js');
 const { crear } = require('./servidor-falso.js');
 
 const salida = path.join(__dirname, '..', 'capturas-real');
@@ -637,10 +638,39 @@ const CLAVE_ADMIN = 'administra-2026', CLAVE_INICIAL = 'limpieza2026';
     await cap(adm, '17-personas-con-telefonos', { fullPage: true });
     await adm.click('#adm-preliquidacion');
     const liq = n => adm.locator('.tabla-liq tbody tr', { hasText: n });
-    igual((await liq('Marta Giménez').locator('td').allTextContents()).map(x => x.replace(/\u00a0/g, ' ').trim()).slice(2), ['7 h', '7 h', 'Nada', '40 min', 'Nada', '0', '$ 49.000'], 'preliquidación de Marta: siete horas validadas, la extra verificada aparte y la base por hora');
+    const celdasLiq = async fila => (await fila.locator('td').allTextContents()).map(x => x.replace(/\u00a0/g, ' ').trim());
+    igual(await celdasLiq(liq('Marta Giménez')), ['Marta GiménezSede Centro, por hora$ 7.000 la hora', '$ 98.00014 h en 2 turnos', '50 %debería ir en 50 %', '$ 49.0007 h de 7 h', 'Nada', 'Extra: 40 min', '1'],
+      'preliquidación de Marta: lo previsto son su turno de hoy y el del lunes; cumplió el de hoy completo, y la extra verificada figura aparte');
     igual((await liq('Lucía Paredes').locator('.sub').allTextContents()).filter(x => /Sede/.test(x)), ['Sede Parque, fijo', 'Sede Centro, por hora'], 'una línea por asignación');
+    igual((await celdasLiq(liq('Sede Parque, fijo'))).slice(1, 4).concat((await celdasLiq(liq('Sede Parque, fijo')))[5]), ['$ 85.7148 h en 2 turnospor parte del mes', '50 %debería ir en 50 %', '$ 42.8574 h de 4 h', 'Al día'],
+      'a la asignación fija que empezó hoy le toca la parte del mes de sus dos turnos, y va al día');
+    igual([srv.M.jornadas.filter(j => j.persona_id === persona('Lucía').id && j.f === srv.hoy()).map(j => j.rev), (await celdasLiq(liq('Lucía Paredes').nth(1))).slice(3, 6)], [[null, 'olvido'], ['$ 28.0004 h de 4 h', 'Nada', 'Al día']],
+      'olvidarse de marcar la salida no le descuenta a Lucía los cinco minutos de tolerancia de la llegada');
+    igual((await celdasLiq(liq('Ramón Ortiz'))).slice(1, 6), ['$ 56.0008 h en 2 turnos', '0 %', '$ 0Nada todavía', 'Nada', 'Sin turnos cerrados'], 'quien todavía no cerró ningún turno ya tiene su previsto del mes');
+    igual((await celdasLiq(liq('Carla Sosa')))[1], '$ 7.0001 h en 1 turno1 justificado', 'la ausencia con aviso de Carla sale de lo previsto');
+    const resumenLiq = (await adm.locator('.liq-resumen').textContent()).replace(/\u00a0/g, ' ');
+    contiene(resumenLiq, 'Previsto del mes$ 302.71439 h en 9 turnosCumplido hasta hoy$ 119.85715 h cumplidas de 15 hPrevisto a hoy$ 119.8573 turnos cerrados', 'el resumen del equipo: lo previsto del mes y lo cumplido hasta hoy');
+    contiene(resumenLiq, '40 % de lo previsto para el mes ya está cumplido. La marca muestra dónde debería ir con los turnos ya cerrados: 40 %.1 con horas extra', 'todo va donde debería ir, con una sola asignación con horas extra');
+    igual(await adm.locator('.sedes-sel button').allTextContents(), ['NoviembreMes en curso', 'DiciembreMes que viene'], 'se puede mirar el mes en curso y el que viene');
     igual(await sinDesborde(adm), true, 'la preliquidación no desborda');
     await cap(adm, '18-preliquidacion', { fullPage: true });
+    await borrarAviso(adm);
+    const [bajada] = await Promise.all([adm.waitForEvent('download'), adm.click('#btn-planilla')]);
+    igual([bajada.suggestedFilename(), await aviso(adm)], ['preliquidacion-2026-11.xlsx', 'Planilla descargada: preliquidacion-2026-11.xlsx.'], 'la planilla se descarga en el sitio publicado, con sus cabeceras de seguridad');
+    const planilla = leerPlanilla(fs.readFileSync(await bajada.path())), hp = planilla.hojas['Preliquidación'], ht = planilla.hojas.Turnos;
+    igual([hp.celdas.A2, hp.celdas.B2, hp.celdas.C2, hp.celdas.D2, hp.celdas.E2, hp.celdas.F2, hp.celdas.G2, hp.celdas.J2, hp.celdas.Q2, hp.celdas.T2, hp.celdas.W2, hp.formulas.Y2],
+      ['Marta Giménez', 'Sede Centro', 'Por hora', 7000, 2, 14, 98000, 7, 49000, 0.67, 'Con horas extra', 'Q2+X2'], 'y trae la línea de Marta con los números de la pantalla');
+    igual([hp.celdas.A7, hp.celdas.G7, hp.celdas.Q7, hp.formulas.Q7], ['Total del equipo', 302714, 119857, 'SUM(Q2:Q6)'], 'el total del equipo');
+    const filaMarta = Object.keys(ht.celdas).filter(k => /^C/.test(k) && ht.celdas[k] === 'Marta Giménez').map(k => Number(k.slice(1))).sort((a, b) => a - b);
+    igual([ht.filas, filaMarta.length, ht.celdas['A' + filaMarta[0]], ht.celdas['K' + filaMarta[0]], ht.celdas['L' + filaMarta[0]], ht.celdas['M' + filaMarta[0]], ht.celdas['O' + filaMarta[0]], ht.celdas['R' + filaMarta[0]], ht.celdas['O' + filaMarta[1]]],
+      [11, 2, 46353, 7, 7, 0.67, 'Estrella', 'Código de la pantalla', 'Por venir'], 'y el detalle turno por turno, los cinco de hoy y los cinco del lunes: el de Marta de hoy con cómo fichó, y el del lunes, por venir');
+    const tituloLiq = async () => ((await adm.locator('.seccion', { has: adm.locator('.liq-barra') }).locator('h2').textContent()) || '').trim();
+    await adm.click('#lm-2026-12');
+    igual(await tituloLiq(), 'Preliquidación de diciembre', 'el mes que viene se estima antes de que empiece');
+    igual((await celdasLiq(liq('Marta Giménez'))).slice(1), ['$ 1.225.000', '161 h23 turnos', '14 hno laborable: 7 hincluye $ 98.000 por feriado', 'Ninguna'], 'diciembre de Marta: 23 turnos de siete horas a $ 7.000, más el recargo de sus dos feriados');
+    igual((await celdasLiq(liq('Carla Sosa'))).slice(1), ['$ 147.000', '19 h19 turnos', '2 hno laborable: 1 hincluye $ 14.000 por feriado', '4 turnos'], 'y las vacaciones de Carla salen de lo previsto');
+    await cap(adm, '18b-preliquidacion-mes-que-viene', { fullPage: true });
+    await adm.click('#lm-2026-11');
 
     await adm.click('#adm-personas');
     contiene(await pulsar(adm, filaP('Marta Giménez').locator('button', { hasText: 'Restablecer clave' })), 'Clave restablecida', 'restablece la clave de Marta');
@@ -725,6 +755,21 @@ const CLAVE_ADMIN = 'administra-2026', CLAVE_INICIAL = 'limpieza2026';
     await pulsar(diego, '#btn-salir');
     await diego.waitForSelector('form[data-form="ingreso"]');
     igual(await diego.evaluate(() => [S, localStorage.getItem('plataforma-sesion')]), [null, null], 'al salir no queda ningún dato en la computadora');
+
+    /* ---------- Al cambiar el mes: noviembre queda cerrado para liquidar ---------- */
+    await aLas('09:00', '2026-12-01');
+    await adm.reload({ waitUntil: 'load' });
+    await adm.waitForSelector('.titulo-pagina h1');
+    await adm.click('#adm-preliquidacion');
+    igual(await tituloLiq(), 'Preliquidación de diciembre', 'el primero de diciembre, la preliquidación abre en el mes nuevo');
+    igual(await adm.locator('.sedes-sel button').allTextContents(), ['NoviembreMes cerrado', 'DiciembreMes en curso', 'EneroMes que viene'], 'y noviembre queda como mes cerrado');
+    await adm.click('#lm-2026-11');
+    igual([await tituloLiq(), ((await adm.locator('.seccion', { has: adm.locator('.liq-barra') }).locator('.bajada').textContent()) || '').slice(0, 12)], ['Preliquidación de noviembre', 'Mes cerrado.'], 'se puede volver a noviembre para liquidarlo');
+    igual((await celdasLiq(liq('Marta Giménez'))).slice(1, 4), ['$ 98.00014 h en 2 turnos', '50 %', '$ 49.0007 h de 14 h'], 'con lo que tenía previsto y lo que cumplió: de sus dos turnos, el lunes 30 no fue');
+    contiene((await celdasLiq(liq('Marta Giménez')))[5], 'Faltan 7 h1 inasistencia', 'y la inasistencia del lunes figura como desvío');
+    const [bajadaNov] = await Promise.all([adm.waitForEvent('download'), adm.click('#btn-planilla')]);
+    igual(bajadaNov.suggestedFilename(), 'preliquidacion-2026-11.xlsx', 'y descargar su planilla');
+    contiene(leerPlanilla(fs.readFileSync(await bajadaNov.path())).hojas.Referencias.celdas.B2, 'Mes cerrado.', 'que dice que el mes está cerrado');
 
     if (errores.length) { mal += errores.length; console.log('Errores en la página:\n' + errores.join('\n')); }
   } finally {

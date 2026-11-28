@@ -113,7 +113,7 @@ function alIngreso(mensaje) {
 
 function uiInicial() {
   return { colab: null, tab: 'hoy', cierre: null, recien: null, drafts: {}, casos: {}, detalle: null, descargo: null, festejo: null, errores: {},
-    admin: 'cronograma', sedeGrilla: null, semana: null, fichaje: null, anular: null, vinculo: null, qrSede: null, cambiarInicial: false, editar: null };
+    admin: 'cronograma', sedeGrilla: null, semana: null, mesLiq: null, fichaje: null, anular: null, vinculo: null, qrSede: null, cambiarInicial: false, editar: null };
 }
 const JORNADA_BASE = { entrada: null, salida: null, metodoIn: null, metodoOut: null, cerrada: false, conf: false, decl: null, rev: null, salidaVal: null, justif: null, descargo: null, lic: null, guion: null, manual: true, tocada: true };
 /* Arma el estado que usan las reglas y las vistas a partir de lo que manda el servidor. */
