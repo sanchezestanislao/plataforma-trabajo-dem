@@ -3,6 +3,7 @@
 # Capturas de las pruebas
 /capturas/
 /capturas-sitio/
+/capturas-real/
 node_modules/
 __pycache__/
 .DS_Store

@@ -1,7 +1,7 @@
 /* Service worker del sitio: guarda la aplicación para que abra sin conexión y trae la versión nueva cuando hay red. */
-const VERSION = '7ff892dccf49';
+const VERSION = '83c81575106d';
 const CACHE = 'plataforma-' + VERSION;
-const BASE = ["./", "manifest.webmanifest", "tipografia/overpass-latin-wght-normal.woff2", "iconos/icono-192.png", "iconos/icono-512.png", "iconos/icono-adaptable-512.png", "iconos/apple-touch-icon.png"];
+const BASE = ["./", "app.eb8a2f7eff89.js", "qr.18ae399f8118.js", "manifest.webmanifest", "tipografia/overpass-latin-wght-normal.woff2", "iconos/icono-192.png", "iconos/icono-512.png", "iconos/icono-adaptable-512.png", "iconos/apple-touch-icon.png"];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(BASE)).then(() => self.skipWaiting()));

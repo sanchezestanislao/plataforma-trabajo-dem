@@ -4,6 +4,8 @@
 
 let S = null;
 let avisoT = null;
+/* El sitio publicado define CONFIG (servidor y llave pública): ahí corre la versión real, con real.js. Sin CONFIG, es la demo. */
+const REAL = typeof CONFIG !== 'undefined';
 const RUTAS = ['colaborador', 'supervisor', 'administracion'];
 const $ = (s, r) => (r || document).querySelector(s);
 const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -22,15 +24,20 @@ const FESTEJOS = [
   ['Gracias, {n}', 'Otro día bien hecho. Nos vemos en el próximo turno.'],
   ['Listo, {n}', 'Hoy salió todo en orden. Que disfrutes tu descanso.']
 ];
-const METODO = { qr: 'QR y ubicación', supervisor: 'asistida por supervisor', auto: 'cierre automático' };
+const METODO = REAL
+  ? { qr: 'QR de la sede', codigo: 'código de la pantalla', impreso: 'QR impreso', ubicacion: 'ubicación del teléfono', supervisor: 'asistida por supervisor', auto: 'cierre automático', declarada: 'avisada por la persona' }
+  : { qr: 'QR y ubicación', supervisor: 'asistida por supervisor', auto: 'cierre automático' };
 const LETRA_DIA = { 1: 'L', 2: 'M', 3: 'M', 4: 'J', 5: 'V', 6: 'S', 7: 'D' };
 const LIC_CORTA = { vacaciones: 'Vacac.', licencia: 'Licencia', franco: 'Franco' };
 const nb = t => String(t).replace(/ /g, '&nbsp;');
-const ADMIN_TABS = [['cronograma', 'Cronograma'], ['personal', 'Personal y asignaciones'], ['licencias', 'Licencias y vacaciones'], ['feriados', 'Feriados'], ['reglas', 'Reglas'], ['preliquidacion', 'Preliquidación']];
+const ADMIN_TABS = REAL
+  ? [['cronograma', 'Cronograma'], ['personas', 'Personas'], ['personal', 'Asignaciones'], ['sedes', 'Sedes'], ['licencias', 'Licencias y vacaciones'], ['feriados', 'Feriados'], ['reglas', 'Reglas'], ['preliquidacion', 'Preliquidación']]
+  : [['cronograma', 'Cronograma'], ['personal', 'Personal y asignaciones'], ['licencias', 'Licencias y vacaciones'], ['feriados', 'Feriados'], ['reglas', 'Reglas'], ['preliquidacion', 'Preliquidación']];
 
 /* ---------- Estado en el navegador ---------- */
 
 function guardar() {
+  if (REAL) return;
   try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento, la demo sigue en memoria */ }
 }
 function valido(o) {
@@ -53,6 +60,7 @@ function aviso(t) {
 }
 function ruta() {
   const h = location.hash.replace('#', '');
+  if (REAL) { const p = rutasPermitidas(); return p.indexOf(h) >= 0 ? h : rutaInicial(); }
   return RUTAS.indexOf(h) >= 0 ? h : 'colaborador';
 }
 
@@ -89,7 +97,7 @@ function rango(desde, hasta) {
 }
 function modTexto(m) { return m === 'hora' ? 'Por hora' : 'Fijo'; }
 function sedesOp(sel, lista) {
-  return (lista || S.sedes).map(s => '<option value="' + s.id + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.nombre) + '</option>').join('');
+  return (lista || S.sedes.filter(s => s.activa !== false || s.id === sel)).map(s => '<option value="' + s.id + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.nombre) + '</option>').join('');
 }
 function modOp(sel) {
   return '<option value="fijo"' + (sel === 'fijo' ? ' selected' : '') + '>Fijo</option><option value="hora"' + (sel === 'hora' ? ' selected' : '') + '>Por hora</option>';
@@ -109,10 +117,10 @@ function pillFeriado(f) {
 
 function vistaColab() {
   const c = colabSel(S);
-  if (!c) return '<div class="pagina"><p class="vacio">No hay colaboradores con asignaciones activas. Agregá una desde Administración.</p></div>';
+  if (!c) return '<div class="pagina"><p class="vacio">' + (REAL ? 'Todavía no tenés turnos asignados. Cuando administración cargue tu asignación, tu turno aparece acá.' : 'No hay colaboradores con asignaciones activas. Agregá una desde Administración.') + '</p></div>';
   const tabs = [['hoy', 'Hoy'], ['jornadas', 'Mis jornadas'], ['novedades', 'Novedades'], ['capacitacion', 'Capacitación']];
   const cuerpo = S.ui.tab === 'jornadas' ? jornadasHtml(c) : S.ui.tab === 'novedades' ? novedadesColabHtml(c) : S.ui.tab === 'capacitacion' ? capacitacionHtml(c) : hoyHtml(c);
-  return '<div class="demo-colab">' +
+  return '<div class="' + (REAL ? 'app-colab' : 'demo-colab') + '">' +
     '<div class="telefono">' +
       '<div class="cabecera-app"><p class="fecha-app">' + cap(fechaLarga(S.hoy)) + ', ' + hm(S.ahora) + '</p><h1>Hola, ' + esc(c.nombre) + '</h1></div>' +
       '<div class="pantalla" id="pantalla">' + cuerpo + '</div>' +
@@ -120,11 +128,18 @@ function vistaColab() {
         tabs.map(t => '<button type="button" data-a="tab" data-tab="' + t[0] + '" id="tab-' + t[0] + '"' + (S.ui.tab === t[0] ? ' aria-current="true"' : '') + '>' + ICONOS[t[0]] + '<span>' + t[1] + '</span></button>').join('') +
       '</nav>' +
     '</div>' +
-    '<aside class="guia">' + guiaHtml(c) + '</aside>' +
+    (REAL ? '' : '<aside class="guia">' + guiaHtml(c) + '</aside>') +
   '</div>';
 }
 
 function hoyHtml(c) {
+  if (REAL && S.ui.fichaje) {
+    const f = fichajeHtml();
+    if (f) return f;
+    /* El turno que se estaba fichando ya no existe (cambió la asignación): se vuelve a la pantalla de hoy. */
+    cerrarCamara();
+    S.ui.fichaje = null;
+  }
   const ts = tramosHoy(S, c.id);
   const pend = pendienteDeclarar(S, c.id);
   const fer = feriadoEl(S, S.hoy);
@@ -172,6 +187,16 @@ function olvidoHtml(j) {
 function sinEntradaHtml(j, e) {
   let n = '';
   if (e.enVivo) n = '<p class="nota ' + (e.estado === 'rojo' ? 'falta' : 'obs') + '">Tu turno empezó a las ' + hm(j.ti) + '. Marcá la entrada apenas llegues.</p>';
+  if (REAL) {
+    const modo = sedeDe(j).verificacion;
+    return '<section class="bloque">' +
+      '<div><p class="sede">' + esc(sedeNombre(S, j.sede)) + '</p><p class="turno-txt">Tu turno es de ' + hm(j.ti) + ' a ' + hm(j.tf) + '.</p></div>' + n +
+      '<button class="btn primario ancho" type="button" data-a="entrada" id="btn-entrada">Marcar entrada</button>' +
+      '<p class="ayuda">' + (modo === 'ubicacion' ? 'Al marcar, la aplicación usa la ubicación de tu teléfono para confirmar que estás en la sede.'
+        : modo === 'impreso' ? 'Al marcar, vas a leer el QR que está pegado en la sede. La hora la pone el sistema.'
+        : 'Al marcar, vas a leer el código de la pantalla de la sede. La hora la pone el sistema.') + '</p>' +
+    '</section>';
+  }
   return '<section class="bloque">' +
     '<div><p class="sede">' + esc(sedeNombre(S, j.sede)) + '</p><p class="turno-txt">Tu turno es de ' + hm(j.ti) + ' a ' + hm(j.tf) + '.</p></div>' + n +
     '<div class="qr-caja">' + qrSvg() + '<p>QR de ' + esc(sedeNombre(S, j.sede)) + '</p></div>' +
@@ -219,6 +244,7 @@ function formCierreHtml(j) {
     medio +
     '<p class="error" role="alert">' + esc(k.error || '') + '</p>' +
     '<button class="btn primario ancho" type="submit" id="btn-cerrar">Cerrar jornada</button>' +
+    (REAL ? '<p class="ayuda">Al cerrar, la aplicación te pide el código de la sede y registra la salida con la hora del sistema.</p>' : '') +
     '<button class="btn ancho" type="button" data-a="cancelar-cierre" id="btn-cancelar-cierre">Volver</button>' +
   '</form>';
 }
@@ -270,7 +296,7 @@ function cerradaHtml(c, j, e) {
     '<div class="semaforo-v" aria-hidden="true">' + focos + '</div>' +
     '<h2>' + titulo + '</h2>' +
     '<p class="mensaje">' + esc(msj) + '</p>' +
-    '<p class="resultado">' + chip(e.estado) + '<span>' + esc(e.detalle) + ', de ' + hm(j.entrada) + ' a ' + hm(j.salida) + ' en ' + esc(sede) + '</span></p>' +
+    '<p class="resultado">' + chip(e.estado) + '<span>' + esc(e.detalle) + (j.salida == null ? ', con entrada a las ' + hm(j.entrada) : ', de ' + hm(j.entrada) + ' a ' + hm(j.salida)) + ' en ' + esc(sede) + '</span></p>' +
     lineaRacha +
     '<div class="acciones">' + botones + '</div>' +
   '</section>';
@@ -333,7 +359,7 @@ function novedadesColabHtml(c) {
       '<fieldset class="campo"><legend>Urgencia</legend><div class="segmento">' +
         Object.keys(CRITICIDAD).map(k => '<label><input type="radio" name="nov-crit" id="nov-crit-' + k + '" value="' + k + '" data-draft="novCrit"' + (k === crit ? ' checked' : '') + '><span>' + CRITICIDAD[k] + '</span></label>').join('') + '</div></fieldset>' +
       '<label class="campo" for="nov-texto">¿Qué pasó?<textarea id="nov-texto" data-draft="novTexto" rows="3" maxlength="400" placeholder="Se rompió el secador de manos del baño de planta baja">' + esc(d.novTexto || '') + '</textarea></label>' +
-      '<label class="campo" for="nov-foto">Foto, si ayuda a entenderlo<input type="file" id="nov-foto" accept="image/*"></label>' +
+      (REAL ? '' : '<label class="campo" for="nov-foto">Foto, si ayuda a entenderlo<input type="file" id="nov-foto" accept="image/*"></label>') +
       '<p class="error" role="alert">' + esc(S.ui.errores.nov || '') + '</p>' +
       '<button class="btn primario ancho" type="submit" id="btn-nov">Enviar novedad</button>' +
     '</form>' +
@@ -436,8 +462,8 @@ function detalleHtml(j) {
   if (!j.justif) {
     p.push('Turno de ' + hm(j.ti) + ' a ' + hm(j.tf) + ' en ' + esc(sedeNombre(S, j.sede)) + '.');
     if (fer) p.push((fer.tipo === 'feriado' ? 'Feriado: ' : 'Día no laborable: ') + esc(fer.nombre) + '.');
-    if (j.entrada != null) p.push('Entrada ' + hm(j.entrada) + ' (' + (METODO[j.metodoIn] || METODO.qr) + ').');
-    if (j.cerrada && j.entrada != null) p.push(j.salida == null ? 'Salida sin marcar (cierre automático).' : 'Salida ' + hm(j.salida) + ' (' + (METODO[j.metodoOut] || METODO.qr) + ').');
+    if (j.entrada != null) p.push('Entrada ' + hm(j.entrada) + ' (' + (METODO[j.metodoIn] || METODO.qr) + (REAL ? esc(evidenciaTexto(j.ubiIn)) : '') + ').');
+    if (j.cerrada && j.entrada != null) p.push(j.salida == null ? (j.metodoOut === 'declarada' ? 'Salida sin marcar: la persona avisó la hora.' : 'Salida sin marcar (cierre automático).') : 'Salida ' + hm(j.salida) + ' (' + (METODO[j.metodoOut] || METODO.qr) + (REAL ? esc(evidenciaTexto(j.ubiOut)) : '') + ').');
     if (j.rev && j.salidaVal != null && j.salidaVal !== j.salida) p.push('Salida validada por supervisión: ' + hm(j.salidaVal) + '.');
     if (j.decl) p.push('Declaración: ' + esc(declTexto(j)));
     if (j.descargo) p.push('Aviso del colaborador: ' + esc(j.descargo));
@@ -495,8 +521,8 @@ function vistaSupervisor() {
     let accion = '';
     if (!j.cerrada && !j.justif) accion = '<button class="btn chico" type="button" data-a="asistido" data-j="' + j.id + '" id="asis-' + j.id + '">' + (j.entrada == null ? 'Fichar entrada' : 'Fichar salida') + '</button>';
     return '<tr><td><span class="nombre">' + esc(nombreCompleto(c)) + '</span></td><td>' + esc(sedeNombre(S, j.sede)) + '</td><td>' + hm(j.ti) + ' a ' + hm(j.tf) + (j.f !== S.hoy ? ', desde ayer' : '') + '</td>' +
-      '<td>' + (j.justif ? 'No ficha' : j.entrada == null ? 'Pendiente' : hm(j.entrada) + (j.metodoIn === 'supervisor' ? ', asistida' : '')) + '</td>' +
-      '<td>' + (j.justif ? 'No ficha' : j.salida == null ? (j.cerrada && j.entrada != null ? 'Sin marcar' : 'Pendiente') : hm(j.salida) + (j.metodoOut === 'supervisor' ? ', asistida' : '')) + '</td>' +
+      '<td>' + (j.justif ? 'No ficha' : j.entrada == null ? 'Pendiente' : hm(j.entrada) + (j.metodoIn === 'supervisor' ? ', asistida' : '') + (REAL ? respaldoCorto(j.ubiIn) : '')) + '</td>' +
+      '<td>' + (j.justif ? 'No ficha' : j.salida == null ? (j.cerrada && j.entrada != null ? 'Sin marcar' : 'Pendiente') : hm(j.salida) + (j.metodoOut === 'supervisor' ? ', asistida' : '') + (REAL ? respaldoCorto(j.ubiOut) : '')) + '</td>' +
       '<td><span class="estado-celda">' + chip(e.estado) + '<span>' + esc(e.detalle) + '</span></span></td><td class="num">' + accion + '</td></tr>';
   }).join('');
 
@@ -509,7 +535,7 @@ function vistaSupervisor() {
   }).join('');
 
   const bit = S.bitacora.slice(0, 6).map(b => '<li class="renglon dos"><div><p>' + esc(cap(b.texto)) + '</p><p class="sub">Supervisión, ' + fechaCorta(b.f) + ' ' + hm(b.m) + '</p></div>' +
-    (b.tipo === 'asistido' ? '<span></span>' : '<div class="renglon-accion"><button class="btn chico" type="button" data-a="deshacer" data-b="' + b.id + '" id="des-' + b.id + '">Deshacer</button></div>') + '</li>').join('');
+    (b.tipo === 'rev' || b.tipo === 'justif' ? '<div class="renglon-accion"><button class="btn chico" type="button" data-a="deshacer" data-b="' + b.id + '" id="des-' + b.id + '">Deshacer</button></div>' : '<span></span>') + '</li>').join('');
 
   const avisos = S.avisos.map(x => '<li class="renglon dos"><div><p>' + esc(x.texto) + '</p><p class="sub">Administración, ' + fechaCorta(x.f) + ' ' + hm(x.m) + '</p></div>' +
     '<div class="renglon-accion"><button class="btn chico" type="button" data-a="quitar-aviso" data-id="' + x.id + '" id="av-' + x.id + '">Visto</button></div></li>').join('');
@@ -523,6 +549,7 @@ function vistaSupervisor() {
       '<li><b>' + novAb + '</b><span>' + (novAb === 1 ? 'novedad abierta' : 'novedades abiertas') + '</span></li>' +
     '</ul>' +
     (avisos ? '<section class="seccion"><h2>Avisos de administración</h2><p class="bajada">Cambios de tope y asignaciones que lo superan. Quedan acá hasta que los marques como vistos.</p><ul class="panel">' + avisos + '</ul></section>' : '') +
+    (REAL ? marcasHtml() : '') +
     '<section class="seccion"><h2>Control excedente de horas</h2><p class="bajada">Cada turno con tiempo de más o sin salida espera acá. Hasta que lo resuelvas no suma horas a la liquidación. En una misma sede, el tiempo de más siempre es hora extra.</p>' +
       '<ul class="panel">' + (pend.length ? pend.map(casoHtml).join('') : '<li class="vacio">No hay turnos para resolver. Todo el tiempo trabajado está validado.</li>') + '</ul></section>' +
     '<section class="seccion"><h2>Equipo de hoy</h2><div class="panel tabla-wrap"><table><thead><tr><th>Colaborador</th><th>Sede</th><th>Turno</th><th>Entrada</th><th>Salida</th><th>Estado</th><th class="num">Fichaje asistido</th></tr></thead><tbody>' +
@@ -541,9 +568,13 @@ function vistaSupervisor() {
 
 function vistaAdmin() {
   const t = ADMIN_TABS.some(x => x[0] === S.ui.admin) ? S.ui.admin : 'cronograma';
-  const cuerpo = t === 'personal' ? adminPersonal() : t === 'licencias' ? adminLicencias() : t === 'feriados' ? adminFeriados() : t === 'reglas' ? adminReglas() : t === 'preliquidacion' ? adminLiquidacion() : adminCronograma();
+  const sinSedes = REAL && !S.sedes.length && (t === 'cronograma' || t === 'personal');
+  const cuerpo = sinSedes ? '<p class="panel vacio">Primero cargá una sede en la pestaña Sedes.</p>'
+    : t === 'personas' ? adminPersonas() : t === 'sedes' ? adminSedes()
+    : t === 'personal' ? adminPersonal() : t === 'licencias' ? adminLicencias() : t === 'feriados' ? adminFeriados() : t === 'reglas' ? adminReglas() : t === 'preliquidacion' ? adminLiquidacion() : adminCronograma();
   return '<div class="pagina">' +
     '<div class="titulo-pagina"><h1>Administración</h1><p>' + cap(fechaLarga(S.hoy)) + ', ' + hm(S.ahora) + '</p></div>' +
+    (REAL ? primerosPasosHtml() : '') +
     '<nav class="subtabs" aria-label="Secciones de administración">' +
       ADMIN_TABS.map(x => '<button type="button" data-a="admin" data-tab="' + x[0] + '" id="adm-' + x[0] + '"' + (x[0] === t ? ' aria-current="true"' : '') + '>' + x[1] + '</button>').join('') +
     '</nav>' + cuerpo +
@@ -652,7 +683,7 @@ function adminCronograma() {
       '</div></section>' +
     '<section class="seccion"><h2>Horario contratado en ' + esc(sedeNombre(S, sede)) + '</h2><p class="bajada">Lo que el cliente contrató: días, franja horaria y cuántas personas tienen que estar. Si la hora de fin no es posterior a la de inicio, la franja termina al día siguiente.</p>' +
       '<div class="panel"><ul>' + (filasFr || '<li class="vacio">Esta sede todavía no tiene horario contratado.</li>') + '</ul>' + formFr + '</div></section>' +
-    '<section class="seccion"><h2>Franjas sin cubrir en las próximas cuatro semanas</h2><p class="bajada">Todas las sedes, desde hoy. Se cubren con una asignación nueva o una cobertura con fecha desde Personal y asignaciones.</p>' +
+    '<section class="seccion"><h2>Franjas sin cubrir en las próximas cuatro semanas</h2><p class="bajada">Todas las sedes, desde hoy. Se cubren con una asignación nueva o una cobertura con fecha desde ' + (REAL ? 'Asignaciones' : 'Personal y asignaciones') + '.</p>' +
       '<ul class="panel">' + (hs || '<li class="vacio">Todo el horario contratado está cubierto.</li>') + '</ul></section>';
 }
 
@@ -665,7 +696,7 @@ function adminPersonal() {
       const at = 'data-asig="' + a.id + '"';
       const vig = a.desde || a.hasta ? (a.desde && a.hasta ? cap(rango(a.desde, a.hasta)) : a.desde ? 'Desde el ' + fechaMedia(a.desde) : 'Hasta el ' + fechaMedia(a.hasta)) : 'Permanente';
       filas += '<tr>' +
-        '<td>' + (i === 0 ? '<input type="text" id="c-nombre-' + c.id + '" data-colab="' + c.id + '" value="' + n + '" maxlength="60" aria-label="Nombre">' : '<span class="mismo">' + n + '</span>') + '</td>' +
+        '<td>' + (i === 0 && !REAL ? '<input type="text" id="c-nombre-' + c.id + '" data-colab="' + c.id + '" value="' + n + '" maxlength="60" aria-label="Nombre">' : (REAL && i === 0 ? '<span class="nombre">' + n + '</span>' : '<span class="mismo">' + (REAL ? '' : n) + '</span>')) + '</td>' +
         '<td><select id="a-sede-' + a.id + '" ' + at + ' data-campo="sede" aria-label="Sede">' + sedesOp(a.sede) + '</select></td>' +
         '<td>' + diasHtml('a-dia-' + a.id, at + ' data-campo="dia"', a.dias) + '</td>' +
         '<td><span class="par"><input type="time" id="a-ti-' + a.id + '" ' + at + ' data-campo="ti" value="' + hm(a.ti) + '" aria-label="Inicio del turno"><span>a</span><input type="time" id="a-tf-' + a.id + '" ' + at + ' data-campo="tf" value="' + hm(a.tf) + '" aria-label="Fin del turno"></span></td>' +
@@ -677,24 +708,25 @@ function adminPersonal() {
     });
   }
   const al = alertas(S);
-  const selC = d.asigColab || 'nuevo', mod = d.asigMod || 'hora';
+  const elegibles = S.colabs.filter(c => c.activa !== false);
+  const selC = d.asigColab || (REAL ? (elegibles[0] || {}).id : 'nuevo'), mod = d.asigMod || 'hora';
   const form = '<form class="form-alta" data-form="asig" novalidate>' +
-    '<label class="campo" for="as-colab">Colaborador<select id="as-colab" data-draft="asigColab"><option value="nuevo"' + (selC === 'nuevo' ? ' selected' : '') + '>Nuevo colaborador</option>' +
-      S.colabs.map(c => '<option value="' + c.id + '"' + (c.id === selC ? ' selected' : '') + '>' + esc(nombreCompleto(c)) + '</option>').join('') + '</select></label>' +
+    '<label class="campo" for="as-colab">Colaborador<select id="as-colab" data-draft="asigColab">' + (REAL ? '' : '<option value="nuevo"' + (selC === 'nuevo' ? ' selected' : '') + '>Nuevo colaborador</option>') +
+      elegibles.map(c => '<option value="' + c.id + '"' + (c.id === selC ? ' selected' : '') + '>' + esc(nombreCompleto(c)) + '</option>').join('') + '</select></label>' +
     (selC === 'nuevo' ? '<label class="campo" for="as-nombre">Nombre y apellido<input type="text" id="as-nombre" data-draft="asigNombre" maxlength="60" value="' + esc(d.asigNombre || '') + '"></label>' : '') +
-    '<label class="campo" for="as-sede">Sede<select id="as-sede" data-draft="asigSede">' + sedesOp(d.asigSede || S.sedes[0].id) + '</select></label>' +
+    '<label class="campo" for="as-sede">Sede<select id="as-sede" data-draft="asigSede">' + sedesOp(d.asigSede || (S.sedes.filter(s => s.activa !== false)[0] || S.sedes[0]).id) + '</select></label>' +
     '<fieldset class="campo"><legend>Días</legend>' + diasHtml('as-dia', 'data-draftdia="asigDias" data-base="5"', borradorDias('asigDias', [1, 2, 3, 4, 5])) + '</fieldset>' +
     '<label class="campo" for="as-ti">Turno desde<input type="time" id="as-ti" data-draft="asigTi" value="' + esc(d.asigTi || '08:00') + '"></label>' +
     '<label class="campo" for="as-tf">Turno hasta<input type="time" id="as-tf" data-draft="asigTf" value="' + esc(d.asigTf || '14:00') + '"></label>' +
     '<label class="campo" for="as-mod">Modalidad de pago<select id="as-mod" data-draft="asigMod">' + modOp(mod) + '</select></label>' +
-    '<label class="campo" for="as-valor">' + (mod === 'hora' ? 'Valor hora' : 'Monto fijo mensual') + '<input type="number" id="as-valor" data-draft="asigValor" min="1" step="100" value="' + esc(d.asigValor || S.ref[mod]) + '"></label>' +
+    '<label class="campo" for="as-valor">' + (mod === 'hora' ? 'Valor hora' : 'Monto fijo mensual') + '<input type="number" id="as-valor" data-draft="asigValor" min="1" step="100" value="' + esc(d.asigValor || valorSugerido(S, mod) || '') + '"></label>' +
     '<label class="campo" for="as-desde">Vigente desde, opcional<input type="date" id="as-desde" data-draft="asigDesde" value="' + esc(d.asigDesde || '') + '"></label>' +
     '<label class="campo" for="as-hasta">Vigente hasta, opcional<input type="date" id="as-hasta" data-draft="asigHasta" value="' + esc(d.asigHasta || '') + '"></label>' +
     '<button class="btn primario" type="submit" id="btn-asig">Agregar asignación</button>' +
     '<p class="error" role="alert">' + esc(S.ui.errores.asig || '') + '</p>' +
   '</form>';
-  return '<section class="seccion"><h2>Personal y asignaciones</h2><p class="bajada">Una asignación es una persona en una sede, con sus días, su turno y su modalidad de pago. Quien trabaja en dos sedes tiene dos, y cada una puede ser fija o por hora. En una misma sede hay una sola: el tiempo de más ahí es hora extra. Un turno que termina antes de la hora en que empieza cruza la medianoche.</p>' +
-    '<div class="panel"><div class="tabla-wrap"><table class="tabla-edit"><thead><tr><th>Colaborador</th><th>Sede</th><th>Días</th><th>Turno asignado</th><th>Modalidad</th><th>Valor de ejemplo</th><th>Vigencia</th><th>Activa</th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
+  return '<section class="seccion"><h2>' + (REAL ? 'Asignaciones' : 'Personal y asignaciones') + '</h2><p class="bajada">' + (REAL ? 'Las personas se dan de alta en la pestaña Personas. ' : '') + 'Una asignación es una persona en una sede, con sus días, su turno y su modalidad de pago. Quien trabaja en dos sedes tiene dos, y cada una puede ser fija o por hora. En una misma sede hay una sola: el tiempo de más ahí es hora extra. Un turno que termina antes de la hora en que empieza cruza la medianoche.</p>' +
+    '<div class="panel"><div class="tabla-wrap"><table class="tabla-edit"><thead><tr><th>Colaborador</th><th>Sede</th><th>Días</th><th>Turno asignado</th><th>Modalidad</th><th>' + (REAL ? 'Valor' : 'Valor de ejemplo') + '</th><th>Vigencia</th><th>Activa</th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
     (al.length ? '<ul class="alertas">' + al.map(x => '<li class="nota obs">' + esc(x.texto) + '</li>').join('') + '</ul>' : '') +
     form + '</div></section>';
 }
@@ -772,44 +804,246 @@ function adminReglas() {
       '</div></section>';
 }
 
-function adminLiquidacion() {
-  const mes = mesDe(S.hoy);
-  let total = 0, filas = '';
-  for (const c of S.colabs) {
-    let sub = 0, cuantas = 0;
-    for (const a of asigsDe(S, c.id)) {
-      const r = resumenAsig(S, a.id, mes);
-      if (!r.jornadas && !r.justificada) continue;
-      const base = baseAsig(S, a, r), rec = recargoFeriado(S, a, r), fer = r.fer.feriado + r.fer.no_laborable;
-      sub += base; cuantas++;
-      const chips = [['verde', r.verde], ['estrella', r.estrella], ['amarillo', r.amarillo], ['rojo', r.rojo], ['revision', r.revision]].filter(x => x[1] > 0).map(x => chip(x[0], x[1])).join('');
-      const rev = r.enRevision || r.sinSalida ? [r.enRevision ? dur(r.enRevision) : '', r.sinSalida ? r.sinSalida + ' sin salida' : ''].filter(Boolean).join(', ') : 'Nada';
-      const celFer = (r.fer.feriado ? dur(r.fer.feriado) : 'Nada') + (r.fer.no_laborable ? '<span class="sub">no&nbsp;laborable: ' + nb(dur(r.fer.no_laborable)) + '</span>' : '');
-      const notaFer = a.modalidad === 'hora' ? (rec ? '<span class="sub">incluye&nbsp;' + ARS.format(rec) + ' por&nbsp;feriado</span>' : '') : fer ? '<span class="sub">feriado según&nbsp;convenio</span>' : '';
-      filas += '<tr><td><span class="nombre">' + esc(nombreCompleto(c)) + '</span><span class="sub">' + esc(sedeNombre(S, a.sede)) + ', ' + modTexto(a.modalidad).toLowerCase() + '</span></td><td><span class="chips">' + chips + '</span></td>' +
-        '<td class="num">' + dur(r.asignadas) + '</td><td class="num">' + dur(r.normales) + '</td><td class="num">' + celFer + '</td><td class="num">' + (r.extra ? dur(r.extra) : 'Nada') + '</td><td class="num">' + rev + '</td><td class="num">' + r.inasistencias + '</td><td class="num"><strong>' + ARS.format(base) + '</strong>' + notaFer + '</td></tr>';
-    }
-    if (cuantas > 1) filas += '<tr class="subtotal"><td colspan="8">Total de ' + esc(nombreCompleto(c)) + ', ' + cuantas + ' asignaciones</td><td class="num"><strong>' + ARS.format(sub) + '</strong></td></tr>';
-    total += sub;
+/* ---------- Preliquidación: lo previsto del mes contra lo cumplido ---------- */
+
+/* Porcentaje para mostrar: no dice 100 si todavía falta algo, ni 0 si ya hay algo. */
+function porc(x) {
+  const n = Math.round(x * 100);
+  return (x > 0 && n < 1 ? 1 : x < 1 && n > 99 ? 99 : n) + ' %';
+}
+function cuantos(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
+/* Una duración con las horas separadas de a miles, para los totales: 1.092 h. */
+function durTotal(min) { return dur(min).replace(/^\d{4,}/, n => n.replace(/\B(?=(\d{3})+$)/g, '.')); }
+function mesLiq() { return mesesLiquidables(S).indexOf(S.ui.mesLiq) >= 0 ? S.ui.mesLiq : mesDe(S.hoy); }
+/* La barra: lo cumplido sobre lo previsto del mes. Mientras el mes corre, la marca señala dónde debería ir con los turnos ya cerrados. */
+function barraAvance(t, enCurso, grande) {
+  const p = x => Math.max(0, Math.min(100, Math.round(x * 1000) / 10));
+  const dice = 'Cumplido ' + porc(t.avance) + ' de lo previsto para el mes' + (enCurso ? '. Con los turnos ya cerrados debería ir en ' + porc(t.esperado) : '') + '.';
+  return '<span class="avance' + (grande ? ' grande' : '') + '" role="img" aria-label="' + dice + '" title="' + dice + '"><span class="av-pista">' +
+    (enCurso ? '<span class="av-esp" style="width:' + p(t.esperado) + '%"></span>' : '') + '<span class="av-hecho" style="width:' + p(t.avance) + '%"></span></span>' +
+    (enCurso && t.esperado > 0 ? '<span class="av-marca" style="left:' + p(t.esperado) + '%"></span>' : '') + '</span>';
+}
+function avanceCelda(t, enCurso) {
+  const pie = '<strong>' + nb(porc(t.avance)) + '</strong>' + (enCurso && (t.cerrados || t.impHoy) ? '<span class="sub">' + nb('debería ir en ' + porc(t.esperado)) + '</span>' : '');
+  return barraAvance(t, enCurso) + '<span class="av-pie">' + pie + '</span>';
+}
+function desviosHtml(v) {
+  const ps = v.desvios.map(d => {
+    if (d.tipo === 'falta') return '<span class="pill ' + (d.grave ? 'crit-alta' : 'crit-media') + '">Faltan ' + dur(d.min) + '</span>' + (d.inasistencias ? '<span class="sub">' + cuantos(d.inasistencias, 'inasistencia', 'inasistencias') + '</span>' : '');
+    if (d.tipo === 'extra') return '<span class="pill">Extra: ' + dur(d.min) + '</span>';
+    const que = [d.min ? dur(d.min) + ' de más' : '', d.sinSalida ? d.sinSalida + ' sin salida' : ''].filter(Boolean).join(' y ');
+    return '<span class="pill est-en_curso">En revisión: ' + (que || cuantos(d.turnos, 'turno', 'turnos')) + '</span>';
+  }).join('');
+  if (ps) return '<span class="desvios">' + ps + '</span>';
+  return v.cerrados ? '<span class="pill est-resuelta">Al día</span>' : '<span class="sub">Sin turnos cerrados</span>';
+}
+function situacionTexto(v) {
+  if (!v.desvios.length) return v.cerrados ? 'Al día' : 'Sin turnos cerrados';
+  return cap(v.desvios.map(d => d.tipo === 'falta' ? 'por debajo' : d.tipo === 'extra' ? 'con horas extra' : 'con turnos en revisión').join(', '));
+}
+function quienLiq(c, a) {
+  return '<span class="nombre">' + esc(nombreCompleto(c)) + '</span><span class="sub">' + esc(sedeNombre(S, a.sede)) + ', ' + modTexto(a.modalidad).toLowerCase() + '</span><span class="sub">' + ARS.format(a.valor) + (a.modalidad === 'hora' ? ' la hora' : ' al mes') + '</span>';
+}
+/* Horas en feriado y en día no laborable de una asignación, y qué pasa con ellas: por hora suman recargo; lo fijo va según convenio. */
+function feriadoLiq(a, fer) {
+  const rec = recargoDe(S, a, fer);
+  return (fer.feriado ? dur(fer.feriado) : 'Nada') + (fer.no_laborable ? '<span class="sub">no&nbsp;laborable: ' + nb(dur(fer.no_laborable)) + '</span>' : '') +
+    (a.modalidad === 'hora' ? (rec ? '<span class="sub">incluye&nbsp;' + ARS.format(rec) + ' por&nbsp;feriado</span>' : '') : fer.feriado + fer.no_laborable ? '<span class="sub">feriado según&nbsp;convenio</span>' : '');
+}
+function filaLiq(c, v, enCurso) {
+  const a = v.a, r = v.r;
+  const chips = [['verde', r.verde], ['estrella', r.estrella], ['amarillo', r.amarillo], ['rojo', r.rojo], ['revision', r.revision]].filter(x => x[1] > 0).map(x => chip(x[0], x[1])).join('');
+  return '<tr><td>' + quienLiq(c, a) + '</td>' +
+    '<td class="num"><strong>' + ARS.format(v.impMes) + '</strong><span class="sub">' + nb(dur(v.prev) + ' en ' + cuantos(v.turnos, 'turno', 'turnos')) + '</span>' +
+      (v.parcial ? '<span class="sub">' + nb('por parte del mes') + '</span>' : '') + (v.justificados ? '<span class="sub">' + nb(cuantos(v.justificados, 'justificado', 'justificados')) + '</span>' : '') + '</td>' +
+    '<td class="c-avance">' + avanceCelda(v, enCurso) + '</td>' +
+    '<td class="num"><strong>' + ARS.format(v.impCumplido) + '</strong><span class="sub">' + nb(v.cerrados ? dur(v.cumplido) + ' de ' + dur(v.prevHoy) : 'Nada todavía') + '</span></td>' +
+    '<td class="num">' + feriadoLiq(a, r.fer) + '</td>' +
+    '<td>' + desviosHtml(v) + '</td>' +
+    '<td><span class="chips">' + chips + '</span></td></tr>';
+}
+/* El mes que viene todavía no empezó: de cada asignación se muestra solo lo previsto. */
+function filaPrevista(c, v) {
+  return '<tr><td>' + quienLiq(c, v.a) + '</td>' +
+    '<td class="num"><strong>' + ARS.format(v.impMes) + '</strong>' + (v.parcial ? '<span class="sub">' + nb('por parte del mes') + '</span>' : '') + '</td>' +
+    '<td class="num">' + nb(dur(v.prev)) + '<span class="sub">' + nb(cuantos(v.turnos, 'turno', 'turnos')) + '</span></td>' +
+    '<td class="num">' + feriadoLiq(v.a, v.fer) + '</td>' +
+    '<td class="num">' + (v.justificados ? nb(cuantos(v.justificados, 'turno', 'turnos')) : 'Ninguna') + '</td></tr>';
+}
+function totalPrevisto(clase, texto, t) {
+  return '<tr' + (clase ? ' class="' + clase + '"' : '') + '><td>' + texto + '</td><td class="num"><strong>' + ARS.format(t.impMes) + '</strong></td><td class="num">' + nb(durTotal(t.prev)) + '<span class="sub">' + nb(cuantos(t.turnos, 'turno', 'turnos')) + '</span></td><td colspan="2"></td></tr>';
+}
+function totalLiq(clase, texto, t, enCurso) {
+  return '<tr' + (clase ? ' class="' + clase + '"' : '') + '><td>' + texto + '</td><td class="num"><strong>' + ARS.format(t.impMes) + '</strong></td><td class="c-avance">' + avanceCelda(t, enCurso) + '</td>' +
+    '<td class="num"><strong>' + ARS.format(t.impCumplido) + '</strong></td><td colspan="3"></td></tr>';
+}
+function resumenLiq(P) {
+  const t = P.total, sinCumplir = (P.enCurso ? t.impHoy : t.impMes) - t.impCumplido;
+  const cifra = (titulo, valor, sub) => '<div><p class="cifra-t">' + titulo + '</p><p class="cifra">' + valor + '</p><p class="sub">' + sub + '</p></div>';
+  if (P.futuro) {
+    let recargo = 0;
+    for (const p of P.personas) for (const v of p.lineas) recargo += recargoDe(S, v.a, v.fer);
+    return '<div class="panel liq-resumen"><div class="cifras">' +
+        cifra('Previsto del mes', ARS.format(t.impMes), durTotal(t.prev) + ' en ' + cuantos(t.turnos, 'turno', 'turnos')) +
+        cifra('Recargo por feriados', ARS.format(recargo), recargo ? 'Ya está incluido en lo previsto' : 'Ningún turno por hora cae en feriado con recargo') +
+        cifra('Equipo', cuantos(P.personas.length, 'persona', 'personas'), cuantos(t.lineas, 'asignación', 'asignaciones') + ' con turnos en el mes') +
+      '</div><p class="liq-pie">Es lo que le tocaría cobrar al equipo si se cumplen todos los turnos.</p></div>';
   }
-  return '<section class="seccion"><h2>Preliquidación de ' + nombreMes(S.hoy) + '</h2><p class="bajada">Turnos cerrados hasta el ' + fechaLarga(S.hoy) + ', una línea por asignación. Las horas en feriado y en día no laborable se cuentan aparte: en las asignaciones por hora suman el recargo definido en Feriados, y en las fijas quedan según convenio.</p>' +
-    '<div class="panel"><div class="tabla-wrap"><table class="tabla-liq"><thead><tr><th>Colaborador y asignación</th><th>Semáforo del mes</th><th class="num">Horas asignadas</th><th class="num">Horas validadas</th><th class="num">En feriado</th><th class="num">Extra verificadas</th><th class="num">En revisión</th><th class="num">Inasistencias</th><th class="num">Base estimada</th></tr></thead><tbody>' + filas + '</tbody>' +
-    '<tfoot><tr><td colspan="8">Base estimada del equipo</td><td class="num"><strong>' + ARS.format(total) + '</strong></td></tr></tfoot></table></div>' +
-    '<p class="pie-tabla">Valores de ejemplo. La base de una asignación por hora son sus horas validadas por el valor hora, más el recargo de feriado. La de una fija es su monto mensual: su liquidación va según convenio y queda para definir. Tampoco suman todavía la hora extra ni el descuento por inasistencia, que figuran aparte.</p></div></section>';
+  const notas = [
+    t.debajo ? '<span class="pill crit-media">' + cuantos(t.debajo, 'asignación por debajo', 'asignaciones por debajo') + '</span>' : '',
+    t.conExtra ? '<span class="pill">' + t.conExtra + ' con horas extra</span>' : '',
+    t.aRevisar ? '<span class="pill est-en_curso">' + t.aRevisar + ' con turnos en revisión</span>' : ''
+  ].filter(Boolean).join('');
+  return '<div class="panel liq-resumen"><div class="cifras">' +
+      cifra('Previsto del mes', ARS.format(t.impMes), durTotal(t.prev) + ' en ' + cuantos(t.turnos, 'turno', 'turnos')) +
+      cifra(P.enCurso ? 'Cumplido hasta hoy' : 'Cumplido', ARS.format(t.impCumplido), t.cerrados ? durTotal(t.cumplido) + ' cumplidas de ' + durTotal(t.prevHoy) : 'Todavía no cerró ningún turno') +
+      (P.enCurso
+        ? cifra('Previsto a hoy', ARS.format(t.impHoy), t.cerrados ? cuantos(t.cerrados, 'turno cerrado', 'turnos cerrados') + (sinCumplir > 0 ? ', ' + ARS.format(sinCumplir) + ' sin cumplir' : '') : 'Empieza a contar cuando cierra el primer turno')
+        : cifra('Sin cumplir', ARS.format(sinCumplir), durTotal(t.falta) + ' de los turnos del mes')) +
+    '</div>' + barraAvance(t, P.enCurso, true) +
+    '<p class="liq-pie"><strong>' + porc(t.avance) + '</strong> de lo previsto para el mes ' + (P.enCurso ? 'ya está cumplido.' : 'quedó cumplido.') + (P.enCurso && t.cerrados ? ' La marca muestra dónde debería ir con los turnos ya cerrados: ' + porc(t.esperado) + '.' : '') + '</p>' +
+    (notas ? '<p class="liq-notas">' + notas + '</p>' : '') + '</div>';
+}
+function adminLiquidacion() {
+  const ms = mesesLiquidables(S), mes = mesLiq(), actual = mesDe(S.hoy), P = preliquidacion(S, mes), t = P.total, nombre = nombreMes(mes + '-01');
+  let filas = '';
+  for (const p of P.personas) {
+    for (const v of p.lineas) filas += P.futuro ? filaPrevista(p.c, v) : filaLiq(p.c, v, P.enCurso);
+    if (p.lineas.length > 1) {
+      const texto = 'Total de ' + esc(nombreCompleto(p.c)) + ', ' + p.lineas.length + ' asignaciones';
+      filas += P.futuro ? totalPrevisto('subtotal', texto, p.total) : totalLiq('subtotal', texto, p.total, P.enCurso);
+    }
+  }
+  const selector = '<div class="sedes-sel">' + ms.map(m => '<button type="button" data-a="liq-mes" data-mes="' + m + '" id="lm-' + m + '"' + (m === mes ? ' aria-current="true"' : '') + '><b>' + cap(nombreMes(m + '-01')) + '</b><span>' + (m === actual ? 'Mes en curso' : m < actual ? 'Mes cerrado' : 'Mes que viene') + '</span></button>').join('') + '</div>';
+  const bajada = P.futuro
+    ? 'Estimación del mes que viene: lo que le toca a cada asignación si se cumplen todos sus turnos, con los horarios, las ausencias y los feriados cargados hoy. Se actualiza sola cuando cambiás una asignación.'
+    : P.enCurso
+      ? 'Lo previsto sale de las asignaciones: los turnos del mes, por su valor. A medida que los turnos se cierran, el avance muestra cuánto ya se cumplió y dónde hay desvíos para corregir. Cuenta los turnos cerrados hasta el ' + fechaLarga(S.hoy) + '.'
+      : 'Mes cerrado. Lo previsto son los turnos que le tocaron a cada asignación, y lo cumplido, sus horas validadas. Lo que siga en revisión se resuelve desde Supervisión.';
+  const cabeza = '<h2>Preliquidación de ' + nombre + '</h2><p class="bajada">' + bajada + '</p>';
+  if (!t.lineas) {
+    return '<section class="seccion">' + cabeza + '<div class="liq-barra">' + selector + '</div>' +
+      '<p class="panel vacio">' + (P.enCurso || P.futuro ? 'Todavía no hay turnos previstos para ' + nombre + '. Cuando cargues una asignación, acá aparece lo que le toca cobrar en el mes.' : 'No quedaron turnos de ' + nombre + '.') + '</p></section>';
+  }
+  const ejemplo = REAL ? '' : 'Valores de ejemplo. ';
+  const tabla = P.futuro
+    ? '<table class="tabla-liq"><thead><tr><th>Colaborador y asignación</th><th class="num">Previsto del mes</th><th class="num">Horas y turnos</th><th class="num">En feriado</th><th class="num">Ausencias cargadas</th></tr></thead><tbody>' + filas + '</tbody>' +
+      '<tfoot>' + totalPrevisto('', 'Total del equipo', t) + '</tfoot></table>'
+    : '<table class="tabla-liq"><thead><tr><th>Colaborador y asignación</th><th class="num">Previsto del mes</th><th>Avance</th><th class="num">Cumplido</th><th class="num">En feriado</th><th>Desvíos</th><th>Semáforo del mes</th></tr></thead><tbody>' + filas + '</tbody>' +
+      '<tfoot>' + totalLiq('', 'Total del equipo', t, P.enCurso) + '</tfoot></table>';
+  const pie = P.futuro
+    ? ejemplo + 'Por hora: los turnos del mes por el valor hora, más el recargo de feriado. Fijo: el monto mensual, o la parte que le toca si la asignación no cubre todo el mes. Las ausencias cargadas no se esperan: por hora salen de lo previsto, y lo fijo no cambia.'
+    : ejemplo + 'Por hora: lo previsto son los turnos del mes por el valor hora, más el recargo de feriado. Fijo: lo previsto es el monto mensual, o la parte que le toca si la asignación no cubre todo el mes; su avance sirve de control, y la liquidación va según convenio. Lo cumplido son las horas validadas de los turnos cerrados, sin descontar los minutos dentro de la tolerancia: un turno en verde cuenta completo. Los turnos justificados no cuentan como faltante. La hora extra y el descuento por inasistencia todavía no suman ni restan importe: figuran en Desvíos. La planilla trae estos datos, el detalle turno por turno y una columna para cargar ajustes.';
+  return '<section class="seccion">' + cabeza +
+    '<div class="liq-barra">' + selector + '<button class="btn primario" type="button" data-a="liq-planilla" id="btn-planilla">Descargar planilla de Excel</button></div>' +
+    resumenLiq(P) +
+    '<div class="panel"><div class="tabla-wrap">' + tabla + '</div><p class="pie-tabla">' + pie + '</p></div></section>';
+}
+
+/* La planilla de Excel de la preliquidación: el resumen por asignación con una columna para ajustar, el detalle turno por turno y las referencias. */
+function planillaLiquidacion(P) {
+  const h2 = min => Math.round(min / 60 * 100) / 100, dec = min => ({ v: h2(min), e: 'dec' }), ent = n => ({ v: n, e: 'entero' });
+  const cols = [
+    ['colab', 'Colaborador', 26], ['sede', 'Sede', 22], ['mod', 'Modalidad', 11], ['valor', 'Valor por hora o por mes ($)', 14],
+    ['turnos', 'Turnos previstos del mes', 10], ['hPrev', 'Horas previstas del mes', 11], ['iPrev', 'Importe previsto del mes ($)', 15],
+    ['cerr', 'Turnos cerrados', 9], ['hHoy', 'Horas previstas a la fecha', 11], ['hCum', 'Horas cumplidas', 11], ['hFalta', 'Horas que faltan', 10],
+    ['inas', 'Inasistencias', 12], ['just', 'Turnos justificados', 11], ['hFer', 'Horas en feriado', 10], ['hNoLab', 'Horas en día no laborable', 11],
+    ['rec', 'Recargo por feriado, ya incluido ($)', 14], ['iCum', 'Importe cumplido ($)', 15], ['av', 'Avance del mes', 9], ['cumpl', 'Cumplimiento a la fecha', 13],
+    ['hExtra', 'Horas extra verificadas', 10], ['hRev', 'Horas en revisión', 10], ['sinSal', 'Turnos sin salida', 9], ['sit', 'Situación', 46],
+    ['ajuste', 'Ajuste ($)', 13], ['liquidar', 'A liquidar ($)', 15]
+  ];
+  const L = {};
+  cols.forEach((c, i) => { L[c[0]] = columna(i); });
+  const razon = (arriba, abajo, n) => 'IF(' + L[abajo] + n + '=0,0,' + L[arriba] + n + '/' + L[abajo] + n + ')';
+  const resumen = [cols.map(c => ({ v: c[1], e: 'titulo' }))];
+  for (const p of P.personas) for (const v of p.lineas) {
+    const n = resumen.length + 1, r = v.r, a = v.a;
+    const f = {
+      colab: nombreCompleto(p.c), sede: sedeNombre(S, a.sede), mod: modTexto(a.modalidad), valor: ent(a.valor),
+      turnos: v.turnos, hPrev: dec(v.prev), iPrev: ent(v.impMes), cerr: v.cerrados, hHoy: dec(v.prevHoy), hCum: dec(v.cumplido),
+      hFalta: { v: Math.round((h2(v.prevHoy) - h2(v.cumplido)) * 100) / 100, e: 'dec', f: L.hHoy + n + '-' + L.hCum + n },
+      inas: r.inasistencias, just: v.justificados, hFer: dec(r.fer.feriado), hNoLab: dec(r.fer.no_laborable), rec: ent(recargoFeriado(S, a, r)), iCum: ent(v.impCumplido),
+      av: { v: v.avance, e: 'pct', f: razon('iCum', 'iPrev', n) }, cumpl: { v: v.prevHoy ? v.cumplido / v.prevHoy : 0, e: 'pct', f: razon('hCum', 'hHoy', n) },
+      hExtra: dec(r.extra), hRev: dec(r.enRevision), sinSal: r.sinSalida, sit: P.futuro ? 'Todavía no empezó' : situacionTexto(v),
+      ajuste: { v: null, e: 'ajuste' }, liquidar: { v: v.impCumplido, e: 'entero', f: L.iCum + n + '+' + L.ajuste + n }
+    };
+    resumen.push(cols.map(c => f[c[0]]));
+  }
+  const ult = resumen.length, nt = ult + 1, t = P.total;
+  const suma = (k, e) => ({ v: resumen.slice(1).reduce((s, fila) => { const c = fila[cols.findIndex(x => x[0] === k)]; return s + (c && typeof c === 'object' ? c.v || 0 : c || 0); }, 0), e: e, f: 'SUM(' + L[k] + '2:' + L[k] + ult + ')' });
+  const tot = { colab: { v: 'Total del equipo', e: 'total' }, av: { v: t.avance, e: 'totalPct', f: razon('iCum', 'iPrev', nt) }, cumpl: { v: t.prevHoy ? t.cumplido / t.prevHoy : 0, e: 'totalPct', f: razon('hCum', 'hHoy', nt) } };
+  for (const k of ['turnos', 'cerr', 'inas', 'just', 'sinSal', 'iPrev', 'rec', 'iCum', 'ajuste', 'liquidar']) tot[k] = suma(k, 'totalEntero');
+  for (const k of ['hPrev', 'hHoy', 'hCum', 'hFalta', 'hFer', 'hNoLab', 'hExtra', 'hRev']) tot[k] = suma(k, 'totalDec');
+  resumen.push(cols.map(c => tot[c[0]] || { v: null, e: 'total' }));
+
+  const colsT = [['Fecha', 12], ['Día', 11], ['Colaborador', 26], ['Sede', 22], ['Modalidad', 11], ['Entrada prevista', 9], ['Salida prevista', 9], ['Entrada', 9], ['Salida', 9], ['Salida validada', 10],
+    ['Horas previstas', 10], ['Horas cumplidas', 10], ['Horas extra verificadas', 10], ['Horas en revisión', 10], ['Semáforo', 13], ['Detalle', 38], ['Feriado', 32], ['Entrada por', 24], ['Salida por', 24]];
+  const hm0 = m => (m == null ? null : { v: m, e: 'hora' }), turnos = [];
+  for (const p of P.personas) for (const v of p.lineas) {
+    const quien = nombreCompleto(p.c), mod = modTexto(v.a.modalidad);
+    const linea = (f, sede, ti, tf, resto) => { const x = feriadoEl(S, f); return { f: f, quien: quien, ti: ti, fila: [{ v: f, e: 'fecha' }, cap(DIAS[diaSemana(f)]), quien, sedeNombre(S, sede), mod, hm0(ti), hm0(tf)].concat(resto.slice(0, 9), [x ? x.nombre : null], resto.slice(9)) }; };
+    for (const j of S.jornadas) {
+      if (j.a !== v.a.id || mesDe(j.f) !== P.mes) continue;
+      const e = ev(S, j), hecho = j.cerrada && !j.justif;
+      turnos.push(linea(j.f, j.sede, j.ti, j.tf, [hm0(j.entrada), hm0(j.salida), j.rev ? hm0(j.salidaVal) : null, j.justif ? null : dec(j.tf - j.ti), hecho ? dec(acreditado(j, e, S.P).min) : null,
+        e.extra ? dec(e.extra) : null, e.enRevision ? dec(e.enRevision) : null, NOMBRE_ESTADO[e.estado] || '', e.detalle, j.metodoIn ? cap(METODO[j.metodoIn] || '') : null, j.metodoOut ? cap(METODO[j.metodoOut] || '') : null]));
+    }
+    for (const x of v.porVenir) turnos.push(linea(x.f, v.a.sede, x.ti, x.tf, [null, null, null, x.lic ? null : dec(x.tf - x.ti), null, null, null, x.lic ? 'Justificada' : 'Por venir', x.lic ? TIPOS_LIC[x.lic] + ' cargada' : 'Según la asignación de hoy', null, null]));
+  }
+  turnos.sort((a, b) => (a.f < b.f ? -1 : a.f > b.f ? 1 : a.quien < b.quien ? -1 : a.quien > b.quien ? 1 : a.ti - b.ti));
+
+  const anio = P.mes.slice(0, 4), cuando = fechaMedia(S.hoy) + ' de ' + S.hoy.slice(0, 4) + ', ' + hm(S.ahora);
+  const N = t0 => ({ v: t0, e: 'nota' }), B = t0 => ({ v: t0, e: 'negrita' });
+  const refs = [
+    [B('Preliquidación de ' + nombreMes(P.mes + '-01') + ' de ' + anio)],
+    [N('Estado'), N(P.futuro ? 'Mes que viene. Todavía no empezó: todo es lo previsto con lo cargado hoy.' : P.enCurso ? 'Mes en curso. Cuenta los turnos cerrados hasta el ' + cuando + '.' : 'Mes cerrado.')],
+    [N('Planilla generada'), N('El ' + cuando + '.')],
+    [],
+    [B('Cómo se calcula')],
+    [N('Previsto del mes'), N('Los turnos del mes de cada asignación: los que ya quedaron registrados y, si el mes corre, los que faltan según la asignación de hoy.')],
+    [N('Por hora'), N('Importe: las horas por el valor hora, más el recargo de feriado (' + S.P.recFeriado + ' % en feriado nacional y ' + S.P.recNoLab + ' % en día no laborable).')],
+    [N('Fijo'), N('El importe previsto es el monto mensual, o la parte que le toca si la asignación no cubre todo el mes. El importe cumplido avanza con las horas cumplidas. Sirve de control: la liquidación va según convenio.')],
+    [N('Horas cumplidas'), N('Las horas validadas de los turnos cerrados, dentro del horario del turno y sin descontar los minutos de tolerancia (' + S.P.gracia + ' min al llegar y al salir). Un turno en verde o con estrella cuenta completo.')],
+    [N('Turnos justificados'), N('Licencia, vacaciones, franco o ausencia con aviso. No cuentan como faltante: por hora salen de lo previsto y en lo fijo se dan por cumplidos.')],
+    [N('Horas extra y en revisión'), N('No suman importe. Las extra ya las verificó supervisión. Las que están en revisión esperan que supervisión las resuelva.')],
+    [N('Ajuste y A liquidar'), N('La columna Ajuste viene vacía para cargar sumas o descuentos. A liquidar es el importe cumplido más el ajuste.')],
+    [N('Semáforo'), N('Verde: turno correcto. Amarillo: llegó o salió fuera de la tolerancia de ' + S.P.gracia + ' min. Rojo: inasistencia o demora mayor a ' + S.P.rojo + ' min. Estrella: hora extra verificada.')]
+  ];
+  return [
+    { nombre: 'Preliquidación', anchos: cols.map(c => c[2]), fijas: 1, filtro: ult, apaisada: true, filas: resumen },
+    { nombre: 'Turnos', anchos: colsT.map(c => c[1]), fijas: 1, filtro: true, apaisada: true, filas: [colsT.map(c => ({ v: c[0], e: 'titulo' }))].concat(turnos.map(x => x.fila)) },
+    { nombre: 'Referencias', anchos: [28, 110], filas: refs }
+  ];
+}
+/* Arma la planilla del mes que se está mirando y la baja al equipo. Devuelve el nombre del archivo. */
+function descargarPlanilla() {
+  const P = preliquidacion(S, mesLiq()), p = S.hoy.split('-').map(Number), nombre = 'preliquidacion-' + P.mes + '.xlsx';
+  const bytes = xlsx(planillaLiquidacion(P), { a: p[0], m: p[1], d: p[2], h: Math.floor(S.ahora / 60), mi: S.ahora % 60 });
+  const url = URL.createObjectURL(new Blob([bytes], { type: TIPO_XLSX }));
+  const a = document.createElement('a');
+  a.href = url; a.download = nombre; a.hidden = true;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return nombre;
 }
 
 /* ---------- Dibujo ---------- */
 
 function render() {
+  if (REAL && !antesDeDibujar()) return;
   if (!S) return;
   const act = document.activeElement && document.activeElement.id;
   const sc = $('#pantalla'), top = sc ? sc.scrollTop : 0;
   const r = ruta();
-  $('#reloj-fecha').textContent = cap(fechaLarga(S.hoy));
-  $('#reloj-hora').value = hm(S.ahora);
-  document.querySelectorAll('.roles a').forEach(a => {
-    if (a.getAttribute('href') === '#' + r) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
-  });
+  if (!REAL) {
+    $('#reloj-fecha').textContent = cap(fechaLarga(S.hoy));
+    $('#reloj-hora').value = hm(S.ahora);
+    document.querySelectorAll('.roles a').forEach(a => {
+      if (a.getAttribute('href') === '#' + r) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    });
+  }
   $('#vista').innerHTML = r === 'supervisor' ? vistaSupervisor() : r === 'administracion' ? vistaAdmin() : vistaColab();
   const sc2 = $('#pantalla');
   if (sc2) sc2.scrollTop = S.ui.arriba ? 0 : top;
@@ -820,6 +1054,7 @@ function render() {
     if (el && el !== document.activeElement) { try { el.focus({ preventScroll: true }); } catch (e) { /* sin foco */ } }
   }
   guardar();
+  if (REAL) despuesDeDibujar();
 }
 
 function ponerHora(min) {
@@ -828,6 +1063,26 @@ function ponerHora(min) {
   S.ahora = Math.min(1439, min);
   tick(S);
   render();
+}
+/* Lo que la persona declara al cerrar. Si falta algo, deja el mensaje en `k.error` y devuelve null. */
+function datosCierre(j, k, d, val) {
+  const rel = relDe(S, j), exc = rel - j.tf;
+  k.error = '';
+  if (exc > S.P.margen) {
+    if (k.que === 'extra') return { conf: false, decl: { tipo: 'extra', hora: null, texto: String(d.cierreTexto || '').trim().slice(0, 200) } };
+    if (k.que === 'olvido') {
+      const h = aRel(j, aMin(val('cierre-hora')));
+      if (h == null) k.error = 'Indicá a qué hora terminaste.';
+      else if (h <= j.entrada || h > rel) k.error = 'La hora tiene que estar entre tu entrada y ahora.';
+      else return { conf: false, decl: { tipo: 'olvido', hora: h, texto: '' } };
+    } else k.error = 'Elegí qué pasó con el tiempo de más.';
+  } else if (k.otras) {
+    const t = String(d.cierreTexto || '').trim();
+    if (!t) k.error = 'Contanos qué fue distinto o volvé a confirmar tus horas.';
+    else return { conf: false, decl: { tipo: 'otras', hora: null, texto: t.slice(0, 200) } };
+  } else if (!k.ok) k.error = 'Confirmá tus horas antes de cerrar.';
+  else return { conf: true, decl: null };
+  return null;
 }
 function limpiarColab() { S.ui.cierre = null; S.ui.recien = null; S.ui.descargo = null; S.ui.errores = {}; S.ui.arriba = true; }
 function alternarDia(lista, dia, marcado) {
@@ -841,7 +1096,9 @@ function alternarDia(lista, dia, marcado) {
 
 document.addEventListener('click', ev0 => {
   const b = ev0.target.closest('[data-a]');
-  if (!b || !S) return;
+  if (!b) return;
+  if (REAL && clicReal(b)) return;
+  if (!S) return;
   const a = b.dataset.a, c = colabSel(S);
   const act = c ? tramoActual(S, c.id) : null;
   let subir = false;
@@ -878,6 +1135,10 @@ document.addEventListener('click', ev0 => {
   else if (a === 'quitar-licencia') { quitarLicencia(S, b.dataset.id); aviso('Ausencia quitada.'); }
   else if (a === 'quitar-feriado') { quitarFeriado(S, b.dataset.f); aviso('Fecha quitada del calendario.'); }
   else if (a === 'sugerido') { ponerParam(S, 'recFeriado', SUGERIDO.recFeriado); ponerParam(S, 'recNoLab', SUGERIDO.recNoLab); aviso('Tratamiento sugerido aplicado.'); }
+  else if (a === 'liq-mes') S.ui.mesLiq = b.dataset.mes;
+  else if (a === 'liq-planilla') {
+    try { aviso('Planilla descargada: ' + descargarPlanilla() + '.'); } catch (e) { aviso('No pudimos armar la planilla. Probá de nuevo.'); }
+  }
   render();
   if (subir) { const g = $('#grilla-seccion'); if (g) { try { g.scrollIntoView({ block: 'start' }); } catch (e) { /* sin desplazamiento */ } } }
 });
@@ -894,6 +1155,7 @@ document.addEventListener('change', ev0 => {
   const t = ev0.target;
   if (!S || !t || !t.dataset) return;
   const ds = t.dataset;
+  if (REAL && cambioReal(t)) return;
   if (t.id === 'reloj-hora') { ponerHora(aMin(t.value)); return; }
   if (t.id === 'sel-colab') { elegirColab(S, t.value); limpiarColab(); render(); return; }
   if (t.name === 'que' && S.ui.cierre) { S.ui.cierre.que = t.value; S.ui.cierre.error = ''; render(); return; }
@@ -930,30 +1192,17 @@ document.addEventListener('change', ev0 => {
 
 document.addEventListener('submit', ev0 => {
   const f = ev0.target.closest('form[data-form]');
-  if (!f || !S) return;
+  if (!f) return;
   ev0.preventDefault();
+  if (REAL) { envioReal(f); return; }
+  if (!S) return;
   const tipo = f.dataset.form, c = colabSel(S), d = S.ui.drafts;
   const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
   const limpiar = claves => claves.forEach(k => { delete d[k]; });
   if (tipo === 'cierre') {
     const j = c ? tramoActual(S, c.id) : null, k = S.ui.cierre;
     if (!j || j.entrada == null || !k) { render(); return; }
-    const rel = relDe(S, j), exc = rel - j.tf;
-    let datos = null;
-    if (exc > S.P.margen) {
-      if (k.que === 'extra') datos = { conf: false, decl: { tipo: 'extra', hora: null, texto: String(d.cierreTexto || '').trim().slice(0, 200) } };
-      else if (k.que === 'olvido') {
-        const h = aRel(j, aMin(val('cierre-hora')));
-        if (h == null) k.error = 'Indicá a qué hora terminaste.';
-        else if (h <= j.entrada || h > rel) k.error = 'La hora tiene que estar entre tu entrada y ahora.';
-        else datos = { conf: false, decl: { tipo: 'olvido', hora: h, texto: '' } };
-      } else k.error = 'Elegí qué pasó con el tiempo de más.';
-    } else if (k.otras) {
-      const t = String(d.cierreTexto || '').trim();
-      if (!t) k.error = 'Contanos qué fue distinto o volvé a confirmar tus horas.';
-      else datos = { conf: false, decl: { tipo: 'otras', hora: null, texto: t.slice(0, 200) } };
-    } else if (!k.ok) k.error = 'Confirmá tus horas antes de cerrar.';
-    else datos = { conf: true, decl: null };
+    const datos = datosCierre(j, k, d, val);
     if (datos) {
       const jc = cerrarJornada(S, j.id, datos);
       S.ui.cierre = null; S.ui.arriba = true;
@@ -1028,6 +1277,9 @@ function arrancar(previo) {
   colabSel(S);
   render();
 }
-if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => S);
-if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(arrancar);
-else arrancar((window.claude && window.claude.hot && window.claude.hot.data) || null);
+if (REAL) arrancarReal();
+else {
+  if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => S);
+  if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(arrancar);
+  else arrancar((window.claude && window.claude.hot && window.claude.hot.data) || null);
+}

@@ -3,16 +3,17 @@
 const path = require('path');
 const fs = require('fs');
 const { chromium } = require('playwright');
+const { leerPlanilla } = require('./planilla-leer.js');
 
-/* Sin variable, prueba el archivo único del artefacto. Con SITIO_URL, la misma recorrida sobre el sitio servido por HTTP. */
-const archivo = process.env.SITIO_URL || 'file://' + path.join(__dirname, '..', 'index.html');
-const salida = path.join(__dirname, '..', process.env.SITIO_URL ? 'capturas-sitio' : 'capturas');
+/* Prueba la demo: el archivo único con datos de ejemplo. La versión real, la que se publica, se recorre con pruebas/real.js. */
+const archivo = 'file://' + path.join(__dirname, '..', 'index.html');
+const salida = path.join(__dirname, '..', 'capturas');
 fs.mkdirSync(salida, { recursive: true });
 for (const f of fs.readdirSync(salida)) fs.unlinkSync(path.join(salida, f));
 
 let ok = 0, mal = 0;
 function igual(real, esperado, nombre) {
-  if (real === esperado) ok++;
+  if (JSON.stringify(real) === JSON.stringify(esperado)) ok++;
   else { mal++; console.log('FALLA  ' + nombre + '\n   esperado ' + JSON.stringify(esperado) + '\n   real     ' + JSON.stringify(real)); }
 }
 function contiene(real, parte, nombre) {
@@ -297,7 +298,55 @@ function contiene(real, parte, nombre) {
   const liq = n => page.locator('.tabla-liq tbody tr', { hasText: n });
   contiene(await plano(liq('Hugo Luna')), 'feriado según convenio', 'lo fijo queda según convenio');
   contiene(await plano(liq('Lucía Paredes')), 'por feriado', 'lo por hora suma el recargo');
+  // Lo previsto del mes contra lo cumplido
+  const resumenLiq = async () => plano(page.locator('.liq-resumen'));
+  contiene(await resumenLiq(), 'Previsto del mes$ 6.783.500989 h en 161 turnos', 'arriba, lo previsto del mes para todo el equipo: los turnos del mes por su valor');
+  contiene(await resumenLiq(), 'Cumplido hasta hoy$ 6.083.132884 h 44 min cumplidas de 904 h', 'lo que ya se cumplió');
+  contiene(await resumenLiq(), '90 % de lo previsto para el mes ya está cumplido. La marca muestra dónde debería ir con los turnos ya cerrados: 92 %.', 'y el avance, contra donde debería ir');
+  contiene(await resumenLiq(), '8 asignaciones por debajo5 con horas extra3 con turnos en revisión', 'con la cuenta de los desvíos');
+  const martaLiq = await plano(liq('Marta Giménez').first());
+  contiene(martaLiq, 'Sede Centro, fijo$ 950.000 al mes$ 950.000120 h en 20 turnos1 justificado', 'lo previsto de Marta: su monto del mes, por sus 20 turnos');
+  contiene(martaLiq, '85 %debería ir en 90 %$ 811.772101 h 40 min de 108 h', 'su avance: cumplió menos de lo que le tocaba hasta hoy');
+  contiene(martaLiq, 'Faltan 6 h 20 min1 inasistenciaExtra: 1 h 10 minEn revisión: 2 h 40 min de más', 'y sus desvíos: lo que faltó, lo que hizo de más y lo que espera revisión');
+  contiene(await plano(liq('Hugo Luna')), '91 %debería ir en 91 %$ 863.636160 h de 160 h', 'quien tiene todos sus turnos en verde va exactamente donde debería');
+  contiene(await plano(liq('Hugo Luna')), 'Al día', 'y figura al día');
+  igual(await liq('Hugo Luna').locator('.avance').getAttribute('aria-label'), 'Cumplido 91 % de lo previsto para el mes. Con los turnos ya cerrados debería ir en 91 %.', 'la barra de avance se puede leer sin verla');
+  igual(await page.locator('.sedes-sel button').allTextContents(), ['NoviembreMes en curso', 'DiciembreMes que viene'], 'se puede mirar el mes en curso o el que viene');
   await cap('15-preliquidacion', { fullPage: true });
+  // La planilla de Excel
+  const [bajada] = await Promise.all([page.waitForEvent('download'), page.click('#btn-planilla')]);
+  igual([bajada.suggestedFilename(), await txt('#aviso')], ['preliquidacion-2026-11.xlsx', 'Planilla descargada: preliquidacion-2026-11.xlsx.'], 'la planilla se descarga con el mes en el nombre');
+  const planilla = leerPlanilla(fs.readFileSync(await bajada.path())), hp = planilla.hojas['Preliquidación'], ht = planilla.hojas.Turnos;
+  igual(Object.keys(planilla.hojas), ['Preliquidación', 'Turnos', 'Referencias'], 'trae el resumen, el detalle de turnos y las referencias');
+  igual([hp.celdas.A2, hp.celdas.B2, hp.celdas.C2, hp.celdas.D2, hp.celdas.E2, hp.celdas.F2, hp.celdas.G2, hp.celdas.I2, hp.celdas.J2, hp.celdas.Q2, hp.celdas.W2],
+    ['Marta Giménez', 'Sede Centro', 'Fijo', 950000, 20, 120, 950000, 108, 101.67, 811772, 'Por debajo, con horas extra, con turnos en revisión'], 'en el resumen, la línea de Marta con los mismos números de la pantalla');
+  igual([hp.formulas.K2, hp.formulas.R2, hp.formulas.Y2, 'X2' in hp.celdas, hp.celdas.Y2], ['I2-J2', 'IF(G2=0,0,Q2/G2)', 'Q2+X2', false, 811772], 'con la columna de ajuste vacía, y lo que hay que liquidar como la suma del importe y el ajuste');
+  igual([hp.celdas.A11, hp.formulas.G11, hp.celdas.G11, hp.celdas.Q11, hp.formulas.Y11], ['Total del equipo', 'SUM(G2:G10)', 6783500, 6083132, 'SUM(Y2:Y10)'], 'y el total del equipo como suma');
+  igual([ht.filas, ht.celdas.A2, ht.celdas.C2, ht.celdas.K2, ht.celdas.L2, ht.celdas.O2, Object.keys(ht.celdas).filter(k => /^O/.test(k) && ht.celdas[k] === 'Por venir').length],
+    [166, 46327, 'Hugo Luna', 8, 8, 'Verde', 9], 'en el detalle, un renglón por turno del mes: los 156 ya registrados y los 9 que faltan');
+  contiene(planilla.hojas.Referencias.celdas.B2, 'Mes en curso. Cuenta los turnos cerrados hasta el 27 de noviembre de 2026', 'y las referencias dicen hasta cuándo cuenta');
+  // Una asignación recién cargada ya tiene su previsto
+  await page.click('#adm-personal');
+  await page.selectOption('#as-colab', 'c8');
+  await page.selectOption('#as-sede', 'norte');
+  await page.fill('#as-ti', '15:00');
+  await page.fill('#as-tf', '19:00');
+  await page.selectOption('#as-mod', 'hora');
+  await page.fill('#as-valor', '7000');
+  await page.click('#btn-asig');
+  await page.click('#adm-preliquidacion');
+  contiene(await plano(liq('Sede Norte, por hora').last()), 'Paula FunesSede Norte, por hora$ 7.000 la hora$ 56.0008 h en 2 turnos0 %$ 0Nada todavíaNadaSin turnos cerrados', 'una asignación recién cargada ya figura con lo previsto para lo que queda del mes');
+  await page.click('#lm-2026-12');
+  contiene(await txt('.seccion > h2'), 'Preliquidación de diciembre', 'el mes que viene se puede mirar antes de que empiece');
+  contiene(await resumenLiq(), 'Recargo por feriados$ 309.500Ya está incluido en lo previsto', 'con el recargo de los feriados que caen en los turnos');
+  contiene(await plano(liq('Sede Norte, por hora').last()), '$ 700.00092 h23 turnos8 hno laborable: 4 hincluye $ 56.000 por feriadoNinguna', 'y la asignación nueva, con su mes entero: 23 turnos y dos feriados de cuatro horas');
+  contiene(await plano(liq('Lucía Paredes')), '$ 819.000114 h19 turnos12 hno laborable: 6 hincluye $ 78.000 por feriado4 turnos', 'las vacaciones ya cargadas salen de lo previsto');
+  igual(await page.locator('.tabla-liq .avance').count(), 0, 'del mes que viene solo hay previsto: todavía no hay avance');
+  const [bajadaDic] = await Promise.all([page.waitForEvent('download'), page.click('#btn-planilla')]);
+  const planillaDic = leerPlanilla(fs.readFileSync(await bajadaDic.path())), hd = planillaDic.hojas['Preliquidación'];
+  igual([bajadaDic.suggestedFilename(), hd.celdas.A5, hd.celdas.G5, hd.celdas.Q5, hd.celdas.W5, Object.keys(planillaDic.hojas.Turnos.celdas).filter(k => /^O/.test(k) && planillaDic.hojas.Turnos.celdas[k] === 'Verde').length],
+    ['preliquidacion-2026-12.xlsx', 'Lucía Paredes', 819000, 0, 'Todavía no empezó', 0], 'y su planilla sirve de presupuesto del mes: todo previsto, nada cumplido');
+  await cap('15b-preliquidacion-mes-que-viene', { fullPage: true });
 
   // Días siguientes: fin de semana, llegada tarde, horas de más y olvido
   await page.goto(archivo + '#colaborador');
@@ -362,6 +411,13 @@ function contiene(real, parte, nombre) {
   await page.waitForSelector('.subtabs');
   await page.click('#adm-preliquidacion');
   contiene(await txt('.seccion > h2'), 'Preliquidación de diciembre', 'preliquidación del mes en curso');
+  igual(await page.locator('.sedes-sel button').allTextContents(), ['NoviembreMes cerrado', 'DiciembreMes en curso', 'EneroMes que viene'], 'al cambiar el mes, noviembre queda como mes cerrado');
+  await page.click('#lm-2026-11');
+  contiene(await txt('.seccion > h2'), 'Preliquidación de noviembre', 'el mes cerrado se puede volver a mirar para liquidar');
+  contiene(await txt('.bajada'), 'Mes cerrado.', 'avisa que está cerrado');
+  contiene(await plano(page.locator('.liq-resumen')), 'Sin cumplir$ ', 'y resume cuánto de lo previsto quedó sin cumplir');
+  igual([await page.locator('.tabla-liq .avance').count() > 0, await page.locator('.tabla-liq .av-marca').count()], [true, 0], 'ya sin la marca de dónde debería ir');
+  await page.click('#lm-2026-12');
   contiene(await plano(liq('Diego Rojas').locator('td >> nth=4')), '6 hno laborable: ', 'las horas del feriado se cuentan aparte de las del día no laborable');
   contiene(await plano(liq('Diego Rojas')), 'incluye $ 39.000 por feriado', 'y el recargo se calcula sobre las 6 h del turno en feriado');
   await page.locator('.tabla-liq').screenshot({ path: path.join(salida, '17-preliquidacion-diciembre.png') });
@@ -434,6 +490,9 @@ function contiene(real, parte, nombre) {
   await page.click('#adm-feriados');
   igual(await sinDesborde(), true, 'feriados sin desborde horizontal en celular');
   await cap('21-celular-feriados', { fullPage: true });
+  await page.click('#adm-preliquidacion');
+  igual(await sinDesborde(), true, 'preliquidación sin desborde horizontal en celular');
+  await cap('21b-celular-preliquidacion', { fullPage: true });
   await page.goto(archivo + '#supervisor');
   await page.waitForSelector('.titulo-pagina h1');
   igual(await sinDesborde(), true, 'supervisión sin desborde horizontal en celular');
@@ -447,6 +506,8 @@ function contiene(real, parte, nombre) {
   await cap('22-oscuro-cronograma');
   await page.click('#adm-feriados');
   await cap('23-oscuro-feriados');
+  await page.click('#adm-preliquidacion');
+  await cap('24-oscuro-preliquidacion');
 
   await browser.close();
   if (errores.length) { mal += errores.length; console.log('Errores en la página:\n' + errores.join('\n')); }

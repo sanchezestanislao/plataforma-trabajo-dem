@@ -12,13 +12,21 @@
 </head>
 <body>
 <header class="barra">
+<!--DEMO-->
   <div class="marca"><strong>Plataforma de trabajo</strong><span>Prototipo con datos de ejemplo</span></div>
   <nav class="roles" aria-label="Vistas del prototipo">
     <a href="#colaborador">Colaborador</a>
     <a href="#supervisor">Supervisor</a>
     <a href="#administracion">Administración</a>
   </nav>
+<!--/DEMO-->
+<!--REAL
+  <div class="marca"><strong>Plataforma de trabajo</strong></div>
+  <nav class="roles" id="nav-roles" aria-label="Secciones" hidden></nav>
+  <div class="cuenta" id="cuenta"></div>
+REAL-->
 </header>
+<!--DEMO-->
 <section class="reloj" aria-label="Reloj de la demo">
   <span class="reloj-cuando"><span class="reloj-titulo">Reloj de la demo</span><span class="reloj-fecha" id="reloj-fecha"></span></span>
   <label class="oculto" for="reloj-hora">Hora simulada</label>
@@ -28,13 +36,18 @@
   <button class="btn-r empuja" type="button" data-a="dia" id="reloj-dia">Pasar al día siguiente</button>
   <button class="btn-r" type="button" data-a="reiniciar" id="reloj-reiniciar">Reiniciar demo</button>
 </section>
+<!--/DEMO-->
+<!--REAL
+<p class="estado-red" id="estado-red" role="status" hidden>Sin conexión. Lo que ves puede estar desactualizado.</p>
+REAL-->
 <!--INSTALAR-->
 <main id="vista"></main>
 <div id="aviso" role="status" aria-live="polite"></div>
+<!--GUION-->
 <script>
 /*LOGICA*/
 /*VISTAS*/
-/*SITIO*/
 </script>
+<!--/GUION-->
 </body>
 </html>

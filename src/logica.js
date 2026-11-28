@@ -78,6 +78,8 @@ function dur(m) {
   return r + ' min';
 }
 function cap(t) { return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
+/* Marcas que hace la propia persona: QR de la pantalla, código escrito, QR impreso o solo ubicación. */
+function esPropia(m) { return m === 'qr' || m === 'codigo' || m === 'impreso' || m === 'ubicacion'; }
 function enLista(l) { return l.length < 2 ? l.join('') : l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1]; }
 function fechaObj(iso) { const p = iso.split('-').map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2])); }
 function isoDe(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
@@ -211,6 +213,10 @@ function ev(S, j) { return evaluar(j, S.P, relDe(S, j)); }
 function porInicio(a, b) { return a.f < b.f ? -1 : a.f > b.f ? 1 : a.ti - b.ti; }
 function activos(S) { return S.colabs.filter(c => S.asigs.some(a => a.c === c.id && a.activa)); }
 function colabSel(S) {
+  if (S.real) {
+    const yo = S.yo ? colab(S, S.yo.id) : null;
+    return yo && S.asigs.some(a => a.c === yo.id && a.activa) ? yo : null;
+  }
   const act = activos(S);
   let c = act.find(x => x.id === S.ui.colab) || null;
   if (!c) {
@@ -219,10 +225,11 @@ function colabSel(S) {
   }
   return c;
 }
-/* Un tramo cuenta para hoy si empieza hoy, o si es un turno nocturno de ayer que sigue abierto o cerró pasada la medianoche. */
+/* Un tramo cuenta para hoy si empieza hoy, o si es de ayer y sigue abierto o cerró pasada la medianoche:
+   el turno nocturno, y también el de la tarde que se alarga más allá de las 24. */
 function vivoHoy(S, j) {
   if (j.f === S.hoy) return true;
-  if (j.tf <= 1440 || j.f !== sumarDias(S.hoy, -1)) return false;
+  if (j.f !== sumarDias(S.hoy, -1)) return false;
   return !j.cerrada || (j.salida != null && j.salida > 1440);
 }
 function tramosHoy(S, cId) { return S.jornadas.filter(j => j.c === cId && vivoHoy(S, j)).sort(porInicio); }
@@ -314,8 +321,18 @@ function impactoFeriado(S, x) {
 
 /* ---------- Resumen para la preliquidación ---------- */
 
+/* Lo que un turno cerrado da por cumplido: sus minutos validados, sin descontar los que quedan dentro de la tolerancia.
+   Quien llega hasta P.gracia minutos tarde cuenta desde el inicio del turno, y quien se va hasta P.gracia minutos antes,
+   hasta el final. Así un turno en verde o con estrella cuenta completo, y en los demás se descuenta solo lo que pasó la tolerancia. */
+function acreditado(j, e, P) {
+  if (j.entrada == null || e.normales <= 0) return { desde: j.ti, min: 0 };
+  const fin = e.desde + e.normales;
+  const desde = e.demora <= P.gracia ? j.ti : e.desde, hasta = j.tf - fin <= P.gracia ? j.tf : fin;
+  return { desde: desde, min: Math.max(0, hasta - desde) };
+}
+
 function resumen(S, filtro, mes) {
-  const o = { verde: 0, amarillo: 0, rojo: 0, estrella: 0, revision: 0, justificada: 0, jornadas: 0, asignadas: 0, normales: 0, extra: 0, enRevision: 0, sinSalida: 0, inasistencias: 0, cerradasPorColab: 0, conEntrada: 0, fer: { feriado: 0, no_laborable: 0 } };
+  const o = { verde: 0, amarillo: 0, rojo: 0, estrella: 0, revision: 0, justificada: 0, jornadas: 0, asignadas: 0, normales: 0, acreditados: 0, extra: 0, enRevision: 0, sinSalida: 0, inasistencias: 0, cerradasPorColab: 0, conEntrada: 0, fer: { feriado: 0, no_laborable: 0 } };
   for (const j of S.jornadas) {
     if (mesDe(j.f) !== mes || !filtro(j)) continue;
     const e = ev(S, j);
@@ -327,28 +344,142 @@ function resumen(S, filtro, mes) {
     o.normales += e.normales;
     o.extra += e.extra;
     o.enRevision += e.enRevision;
-    if (e.normales > 0) {
-      const m = minutosFeriado(S, j, e.desde, e.desde + e.normales);
+    const ac = acreditado(j, e, S.P);
+    o.acreditados += ac.min;
+    if (ac.min > 0) {
+      const m = minutosFeriado(S, j, ac.desde, ac.desde + ac.min);
       o.fer.feriado += m.feriado;
       o.fer.no_laborable += m.no_laborable;
     }
     if (e.pendiente && j.salida == null) o.sinSalida++;
     if (e.inasistencia) o.inasistencias++;
-    if (j.entrada != null) { o.conEntrada++; if (j.metodoOut === 'qr') o.cerradasPorColab++; }
+    if (j.entrada != null) { o.conEntrada++; if (esPropia(j.metodoOut)) o.cerradasPorColab++; }
   }
   return o;
 }
 function resumenMes(S, cId, mes) { return resumen(S, j => j.c === cId, mes); }
 function resumenAsig(S, aId, mes) { return resumen(S, j => j.a === aId, mes); }
-/* Lo que suma el feriado trabajado en una asignación por hora, con el recargo que definió administración. */
-function recargoFeriado(S, a, r) {
+/* Lo que suman los minutos en feriado de una asignación por hora, con el recargo que definió administración. */
+function recargoDe(S, a, fer) {
   if (a.modalidad !== 'hora') return 0;
-  return Math.round((r.fer.feriado * S.P.recFeriado + r.fer.no_laborable * S.P.recNoLab) / 100 * a.valor / 60);
+  return Math.round((fer.feriado * S.P.recFeriado + fer.no_laborable * S.P.recNoLab) / 100 * a.valor / 60);
 }
-/* Base de una asignación: por hora, horas validadas por valor más recargo de feriado; fija, su monto (el resto, según convenio). */
-function baseAsig(S, a, r) {
-  if (a.modalidad !== 'hora') return a.valor;
-  return Math.round(r.normales / 60 * a.valor) + recargoFeriado(S, a, r);
+function recargoFeriado(S, a, r) { return recargoDe(S, a, r.fer); }
+
+/* ---------- Avance del mes: lo previsto por las asignaciones contra lo cumplido ---------- */
+
+function mesAnterior(mes) { return mesDe(sumarDias(mes + '-01', -1)); }
+function diasDelMes(mes) {
+  const o = [];
+  for (let f = mes + '-01'; mesDe(f) === mes; f = sumarDias(f, 1)) o.push(f);
+  return o;
+}
+function mesSiguiente(mes) { return mesDe(sumarDias(mes + '-28', 4)); }
+/* Los meses que muestra la preliquidación: el anterior, si dejó turnos, el que corre y el que viene. */
+function mesesLiquidables(S) {
+  const actual = mesDe(S.hoy), ant = mesAnterior(actual);
+  return (S.jornadas.some(j => mesDe(j.f) === ant) ? [ant] : []).concat([actual, mesSiguiente(actual)]);
+}
+/* Minutos que suma el horario semanal de una asignación entre dos fechas, sin mirar vigencia ni ausencias. */
+function minutosPatron(a, desde, hasta) {
+  let n = 0;
+  for (let f = desde; f <= hasta; f = sumarDias(f, 1)) if (a.dias.indexOf(dIso(f)) >= 0) n += a.tf - a.ti;
+  return n;
+}
+/* Avance de una asignación en un mes: lo previsto contra lo cumplido.
+   Lo previsto son sus turnos del mes: los que ya quedaron registrados y los que faltan según la asignación de hoy.
+   Del mes que viene todavía no hay nada registrado: todo sale de la asignación.
+   Un turno justificado (licencia, vacaciones, franco o aviso) no se espera: por hora sale de lo previsto y en lo fijo se da por cumplido.
+   Importes. Por hora: minutos por valor hora, más el recargo de feriado. Fija: su monto mensual, en proporción si la asignación
+   no cubre todo el mes, y lo cumplido avanza con las horas cumplidas. La hora extra no suma importe: figura aparte.
+     turnos, prev   turnos y minutos que se esperan en el mes        prevHoy    minutos de los turnos ya cerrados
+     cumplido       minutos que esos turnos dan por cumplidos        falta      lo que les faltó: prevHoy menos cumplido
+     porVenir       los turnos que faltan del mes                    impMes, impHoy, impCumplido   lo mismo en pesos
+     avance, esperado   impCumplido e impHoy sobre impMes */
+function avanceAsig(S, a, mes) {
+  const r = resumenAsig(S, a.id, mes), actual = mesDe(S.hoy), enCurso = mes === actual, c = colab(S, a.c);
+  const v = {
+    a: a, r: r, enCurso: enCurso, turnos: 0, cerrados: r.jornadas, justificados: 0,
+    prog: 0, prev: 0, prevHoy: r.asignadas, cumplido: r.acreditados, falta: Math.max(0, r.asignadas - r.acreditados), justHoy: 0,
+    fer: { feriado: 0, no_laborable: 0 }, ferHoy: { feriado: 0, no_laborable: 0 }, porVenir: [],
+    parcial: false, impMes: 0, impHoy: 0, impCumplido: 0, avance: 0, esperado: 0
+  };
+  let primero = null, ultimo = null;
+  const programar = (f, ti, tf, justif, cerrada) => {
+    const min = tf - ti;
+    if (!primero || f < primero) primero = f;
+    if (!ultimo || f > ultimo) ultimo = f;
+    v.prog += min;
+    if (justif) { v.justificados++; if (cerrada) v.justHoy += min; return; }
+    v.turnos++;
+    v.prev += min;
+    const m = minutosFeriado(S, { f: f }, ti, tf);
+    v.fer.feriado += m.feriado; v.fer.no_laborable += m.no_laborable;
+    if (cerrada) { v.ferHoy.feriado += m.feriado; v.ferHoy.no_laborable += m.no_laborable; }
+  };
+  for (const j of S.jornadas) if (j.a === a.id && mesDe(j.f) === mes) programar(j.f, j.ti, j.tf, !!j.justif, !!j.cerrada);
+  /* Lo que falta del mes sale de la asignación como está hoy. */
+  if (mes >= actual && !(c && c.activa === false)) {
+    for (let f = enCurso ? sumarDias(S.hoy, 1) : mes + '-01'; mesDe(f) === mes; f = sumarDias(f, 1)) {
+      if (!trabajaEl(a, f)) continue;
+      const l = licenciaEl(S, a.c, f);
+      programar(f, a.ti, a.tf, !!l, false);
+      v.porVenir.push({ f: f, ti: a.ti, tf: a.tf, lic: l ? l.tipo : null });
+    }
+  }
+  if (a.modalidad === 'hora') {
+    v.impMes = Math.round(v.prev / 60 * a.valor) + recargoDe(S, a, v.fer);
+    v.impHoy = Math.round(v.prevHoy / 60 * a.valor) + recargoDe(S, a, v.ferHoy);
+    v.impCumplido = Math.round(v.cumplido / 60 * a.valor) + recargoDe(S, a, r.fer);
+  } else if (v.prog) {
+    /* El monto es del mes entero: si la asignación empezó o termina adentro del mes, le toca la parte de ese tramo. */
+    const dias = diasDelMes(mes), completo = minutosPatron(a, dias[0], dias[dias.length - 1]);
+    const tramo = minutosPatron(a, primero, ultimo) || v.prog;
+    v.parcial = completo > 0 && tramo < completo;
+    v.impMes = Math.round(a.valor * (v.parcial ? tramo / completo : 1));
+    v.impHoy = Math.round(v.impMes * (v.prevHoy + v.justHoy) / v.prog);
+    v.impCumplido = Math.round(v.impMes * (v.cumplido + v.justHoy) / v.prog);
+  }
+  v.avance = v.impMes ? v.impCumplido / v.impMes : 0;
+  v.esperado = v.impMes ? v.impHoy / v.impMes : 0;
+  return v;
+}
+/* Los desvíos de una asignación: lo que faltó, lo que se hizo de más y lo que espera revisión.
+   Los minutos de menos dentro de la tolerancia no llegan acá: no se descuentan. */
+function desviosDe(v) {
+  const r = v.r, o = [];
+  if (v.falta > 0) o.push({ tipo: 'falta', min: v.falta, grave: r.rojo > 0, inasistencias: r.inasistencias });
+  if (r.extra > 0) o.push({ tipo: 'extra', min: r.extra });
+  if (r.revision > 0) o.push({ tipo: 'revision', turnos: r.revision, min: r.enRevision, sinSalida: r.sinSalida });
+  return o;
+}
+/* La preliquidación de un mes: una línea por asignación con turnos en el mes, agrupadas por persona, y el total del equipo. */
+function preliquidacion(S, mes) {
+  const cero = () => ({ lineas: 0, turnos: 0, cerrados: 0, prev: 0, prevHoy: 0, cumplido: 0, falta: 0, extra: 0, enRevision: 0, impMes: 0, impHoy: 0, impCumplido: 0, debajo: 0, conExtra: 0, aRevisar: 0, avance: 0, esperado: 0 });
+  const o = { mes: mes, enCurso: mes === mesDe(S.hoy), futuro: mes > mesDe(S.hoy), personas: [], total: cero() };
+  for (const c of S.colabs) {
+    const p = { c: c, lineas: [], total: cero() };
+    for (const a of asigsDe(S, c.id)) {
+      const v = avanceAsig(S, a, mes);
+      if (!v.prog) continue;
+      v.desvios = desviosDe(v);
+      p.lineas.push(v);
+      for (const t of [p.total, o.total]) {
+        t.lineas++;
+        t.turnos += v.turnos; t.cerrados += v.cerrados; t.prev += v.prev; t.prevHoy += v.prevHoy; t.cumplido += v.cumplido;
+        t.falta += v.falta; t.extra += v.r.extra; t.enRevision += v.r.enRevision;
+        t.impMes += v.impMes; t.impHoy += v.impHoy; t.impCumplido += v.impCumplido;
+        for (const d of v.desvios) { if (d.tipo === 'falta') t.debajo++; else if (d.tipo === 'extra') t.conExtra++; else t.aRevisar++; }
+      }
+    }
+    if (!p.lineas.length) continue;
+    p.total.avance = p.total.impMes ? p.total.impCumplido / p.total.impMes : 0;
+    p.total.esperado = p.total.impMes ? p.total.impHoy / p.total.impMes : 0;
+    o.personas.push(p);
+  }
+  o.total.avance = o.total.impMes ? o.total.impCumplido / o.total.impMes : 0;
+  o.total.esperado = o.total.impMes ? o.total.impHoy / o.total.impMes : 0;
+  return o;
 }
 
 /* ---------- Topes de horas y avisos ---------- */
@@ -608,6 +739,13 @@ function editarNombre(S, cId, valor) {
   c.nombre = n.nombre.slice(0, 30); c.apellido = n.apellido.slice(0, 40);
   return '';
 }
+/* Valor que se propone para una modalidad: el de referencia o, si no hay, el de la última asignación cargada con esa modalidad. */
+function valorSugerido(S, modalidad, salvoId) {
+  if (S.ref && S.ref[modalidad] > 0) return S.ref[modalidad];
+  let v = 0;
+  for (const a of S.asigs) if (a.modalidad === modalidad && a.id !== salvoId && a.valor > 0) v = a.valor;
+  return v;
+}
 /* ¿Se pisan dos turnos semanales? Tiene en cuenta los que cruzan la medianoche. */
 function sePisan(x, y) {
   for (const d of x.dias) for (const e of y.dias) for (const k of [-1, 0, 1]) {
@@ -643,7 +781,7 @@ function editarAsig(S, id, campo, valor, dia) {
     if (m == null) return 'Escribí una hora válida.';
     if (campo === 'ti') { cand.ti = m; cand.tf = finRel(m, a.tf % 1440); } else cand.tf = finRel(a.ti, m);
   }
-  else if (campo === 'modalidad') { if (valor !== a.modalidad) { cand.modalidad = valor; cand.valor = S.ref[valor] || cand.valor; } }
+  else if (campo === 'modalidad') { if (valor !== a.modalidad) { cand.modalidad = valor; cand.valor = valorSugerido(S, valor, id) || cand.valor; } }
   else if (campo === 'valor') cand.valor = Math.round(Number(valor));
   else if (campo === 'activa') cand.activa = !!valor;
   else if (campo === 'dia') {
@@ -970,7 +1108,7 @@ function sembrar() {
     ],
     feriados: CALENDARIO.map(x => ({ f: x.f, nombre: x.nombre, tipo: x.tipo, nota: x.nota || '' })),
     jornadas: [], novedades: [], bitacora: [], avisos: [],
-    ui: { colab: 'c1', tab: 'hoy', cierre: null, recien: null, drafts: {}, casos: {}, detalle: null, descargo: null, festejo: null, errores: {}, admin: 'cronograma', sedeGrilla: 'centro', semana: lunesDe(INICIO) }
+    ui: { colab: 'c1', tab: 'hoy', cierre: null, recien: null, drafts: {}, casos: {}, detalle: null, descargo: null, festejo: null, errores: {}, admin: 'cronograma', sedeGrilla: 'centro', semana: lunesDe(INICIO), mesLiq: null }
   };
   for (const a of S.asigs) { a.activa = true; a.desde = null; a.hasta = null; }
   let f = '2026-11-01';
