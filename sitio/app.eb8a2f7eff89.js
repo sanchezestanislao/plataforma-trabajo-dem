@@ -3565,7 +3565,7 @@ function planillaLiquidacion(P) {
       hFalta: { v: Math.round((h2(v.prevHoy) - h2(v.cumplido)) * 100) / 100, e: 'dec', f: L.hHoy + n + '-' + L.hCum + n },
       inas: r.inasistencias, just: v.justificados, hFer: dec(r.fer.feriado), hNoLab: dec(r.fer.no_laborable), rec: ent(recargoFeriado(S, a, r)), iCum: ent(v.impCumplido),
       av: { v: v.avance, e: 'pct', f: razon('iCum', 'iPrev', n) }, cumpl: { v: v.prevHoy ? v.cumplido / v.prevHoy : 0, e: 'pct', f: razon('hCum', 'hHoy', n) },
-      hExtra: dec(r.extra), hRev: dec(r.enRevision), sinSal: r.sinSalida, sit: situacionTexto(v),
+      hExtra: dec(r.extra), hRev: dec(r.enRevision), sinSal: r.sinSalida, sit: P.futuro ? 'Todavía no empezó' : situacionTexto(v),
       ajuste: { v: null, e: 'ajuste' }, liquidar: { v: v.impCumplido, e: 'entero', f: L.iCum + n + '+' + L.ajuste + n }
     };
     resumen.push(cols.map(c => f[c[0]]));

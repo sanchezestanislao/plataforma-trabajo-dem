@@ -342,6 +342,10 @@ function contiene(real, parte, nombre) {
   contiene(await plano(liq('Sede Norte, por hora').last()), '$ 700.00092 h23 turnos8 hno laborable: 4 hincluye $ 56.000 por feriadoNinguna', 'y la asignación nueva, con su mes entero: 23 turnos y dos feriados de cuatro horas');
   contiene(await plano(liq('Lucía Paredes')), '$ 819.000114 h19 turnos12 hno laborable: 6 hincluye $ 78.000 por feriado4 turnos', 'las vacaciones ya cargadas salen de lo previsto');
   igual(await page.locator('.tabla-liq .avance').count(), 0, 'del mes que viene solo hay previsto: todavía no hay avance');
+  const [bajadaDic] = await Promise.all([page.waitForEvent('download'), page.click('#btn-planilla')]);
+  const planillaDic = leerPlanilla(fs.readFileSync(await bajadaDic.path())), hd = planillaDic.hojas['Preliquidación'];
+  igual([bajadaDic.suggestedFilename(), hd.celdas.A5, hd.celdas.G5, hd.celdas.Q5, hd.celdas.W5, Object.keys(planillaDic.hojas.Turnos.celdas).filter(k => /^O/.test(k) && planillaDic.hojas.Turnos.celdas[k] === 'Verde').length],
+    ['preliquidacion-2026-12.xlsx', 'Lucía Paredes', 819000, 0, 'Todavía no empezó', 0], 'y su planilla sirve de presupuesto del mes: todo previsto, nada cumplido');
   await cap('15b-preliquidacion-mes-que-viene', { fullPage: true });
 
   // Días siguientes: fin de semana, llegada tarde, horas de más y olvido
